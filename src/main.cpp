@@ -23,9 +23,9 @@
 String command;
 String axisCmd;
 String directionCmd;
-String distanceCmd;
+int distanceCmd;
 
-int powledPWM = 0;
+int powledPWM = 128;
 int powledDir = 0;
 
 void home(String axis)
@@ -50,14 +50,30 @@ void home(String axis)
     }    
 
     Serial.println(digitalRead(limitPin));
+    Serial.print("Limit pin: ");
+    Serial.print(limitPin);
+    Serial.print("\tDirection pin: ");
+    Serial.print(directionPin);
+    Serial.print("\tPulse pin: ");
+    Serial.println(pulsePin);
     Serial.print("Moving home");
-    while (digitalRead(limitPin)==LOW && limitPin>0 && directionPin>0 && pulsePin>0 )
+
+    while (digitalRead(limitPin)==LOW && limitPin>0 && directionPin>0 && pulsePin>-1 )
     {
         Serial.print(".");
         delay(100);
     }
-
+    Serial.print("\n");
     Serial.println("\nHoming complete!");
+}
+
+void motion(String axis, String direction, int distance){
+    Serial.print("Axis: ");
+    Serial.print(axis);
+    Serial.print("\tDirection: ");
+    Serial.print(direction);
+    Serial.print("\tDistance: ");
+    Serial.println(distance);
 }
 
 void setup()
@@ -68,10 +84,10 @@ void setup()
     pinMode(x_max, INPUT_PULLUP);
     pinMode(x_min, INPUT_PULLUP);
 
-    // pinMode(z_max_led, OUTPUT);
-    // pinMode(z_min_led, OUTPUT);
-    // pinMode(x_max_led, OUTPUT);
-    // pinMode(x_min_led, OUTPUT);
+    pinMode(z_max_led, OUTPUT);
+    pinMode(z_min_led, OUTPUT);
+    pinMode(x_max_led, OUTPUT);
+    pinMode(x_min_led, OUTPUT);
 
     pinMode(powled,OUTPUT);
 
@@ -90,17 +106,16 @@ void loop()
         
         axisCmd = command.substring(0,1);
         directionCmd = command.substring(1,2);
-        distanceCmd = command.substring(2,command.length());
-        Serial.print("Axis: ");
-        Serial.print(axisCmd);
-        Serial.print("\tDirection: ");
-        Serial.print(directionCmd);
-        Serial.print("\tDistance: ");
-        Serial.println(distanceCmd);
-        Serial.println("----");
+        distanceCmd = command.substring(2,command.length()).toInt();
 
         if(directionCmd.equals("h")){
             home(axisCmd);
+        }
+        else if(directionCmd.equals("p") || directionCmd.equals("m")){
+            motion(axisCmd, directionCmd, distanceCmd);
+        }
+        else {
+            Serial.println("Unknown command!");
         }
     }
 
@@ -109,17 +124,5 @@ void loop()
     digitalWrite(x_max_led, digitalRead(x_max));
     digitalWrite(x_min_led, digitalRead(x_min));
 
-    if (powledDir>0&&powledPWM<254){
-        powledPWM += 5;
-    }else{
-        powledDir=-1;
-    }
-
-    if (powledDir<1 && powledPWM>0){
-        powledPWM -= 5;
-    }else{
-        powledDir=2;
-    }
-
-    delay(100);
+    delay(10);
 }
