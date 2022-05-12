@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <AccelStepper.h>
 
 #define z_pulse      0
 #define z_direction  1
@@ -47,22 +48,15 @@ void home(String axis)
         limitPin = x_min;
         directionPin = x_direction;
         pulsePin = x_pulse;
-    }    
+    }
 
-    Serial.println(digitalRead(limitPin));
-    Serial.print("Limit pin: ");
-    Serial.print(limitPin);
-    Serial.print("\tDirection pin: ");
-    Serial.print(directionPin);
-    Serial.print("\tPulse pin: ");
-    Serial.println(pulsePin);
     Serial.print("Moving home");
 
     while (digitalRead(limitPin)==LOW && limitPin>0 && directionPin>0 && pulsePin>-1 )
     {
-        Serial.print(".");
-        delay(100);
+        delay(10);
     }
+
     Serial.print("\n");
     Serial.println("\nHoming complete!");
 }
@@ -74,6 +68,15 @@ void motion(String axis, String direction, int distance){
     Serial.print(direction);
     Serial.print("\tDistance: ");
     Serial.println(distance);
+
+    if (axis.equals("z")){
+
+    }else if(axis.equals("x")){
+
+    }else{
+        Serial.print("AXIS UNKNOWN");
+    }
+
 }
 
 void setup()
@@ -96,14 +99,13 @@ void setup()
 
 void loop()
 {
-
     analogWrite(powled,powledPWM);
-
     if(Serial.available()){
         command = Serial.readStringUntil('\n');
         command.trim();
         Serial.println(command);
         
+        // ? Command structure: apXXX
         axisCmd = command.substring(0,1);
         directionCmd = command.substring(1,2);
         distanceCmd = command.substring(2,command.length()).toInt();
@@ -115,7 +117,7 @@ void loop()
             motion(axisCmd, directionCmd, distanceCmd);
         }
         else {
-            Serial.println("Unknown command!");
+            Serial.print("Unknown command!\r");
         }
     }
 
