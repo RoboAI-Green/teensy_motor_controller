@@ -21,6 +21,9 @@
 
 #define powled       13
 
+AccelStepper stepperX(1,x_pulse,x_direction);
+AccelStepper stepperZ(1,z_pulse,z_direction);
+
 String command;
 String axisCmd;
 String directionCmd;
@@ -70,6 +73,15 @@ void motion(String axis, String direction, int distance){
     Serial.println(distance);
 
     if (axis.equals("z")){
+        if(direction.equals('p')){
+            stepperZ.move(distance);
+            while(digitalRead(z_max)==LOW && stepperZ.distanceToGo()!=0){
+                
+            }
+        }
+        else{
+
+        }
 
     }else if(axis.equals("x")){
 

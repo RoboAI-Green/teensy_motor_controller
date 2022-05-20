@@ -14,7 +14,7 @@ import os
 import shutil
 Import("env", "projenv")
 
-deviceVID  = "0x16C0"
+deviceVID  = "0x1209"
 devicePID  = "0xAD10"
 propName = "Teensy Motor Controller"
 deviceName = '{'
