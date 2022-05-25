@@ -39,15 +39,19 @@ void home(String axis)
     int limitPin = -1;
     int directionPin = -1;
     int pulsePin = -1;
+    int distance = -1;
+    AccelStepper motor;
 
     if (axis.equals("z"))
     {
+        motor = stepperZ;
         limitPin = z_min;
         directionPin = z_direction;
         pulsePin = z_pulse;
     }
     else if(axis.equals("x"))
     {
+        motor = stepperX;
         limitPin = x_min;
         directionPin = x_direction;
         pulsePin = x_pulse;
@@ -57,9 +61,14 @@ void home(String axis)
 
     while (digitalRead(limitPin)==LOW && limitPin>0 && directionPin>0 && pulsePin>-1 )
     {
-        delay(10);
+        motor.moveTo(distance);
+        distance--;
+        motor.run();
+        delay(5);
     }
 
+    motor.setCurrentPosition(0);
+    
     Serial.print("\n");
     Serial.println("\nHoming complete!");
 }
@@ -76,7 +85,7 @@ void motion(String axis, String direction, int distance){
         if(direction.equals('p')){
             stepperZ.move(distance);
             while(digitalRead(z_max)==LOW && stepperZ.distanceToGo()!=0){
-                
+                stepperZ.run();
             }
         }
         else{
