@@ -59,6 +59,8 @@ if not os.path.exists(fileNameBackup):
     shutil.copyfile(fileName, fileNameBackup)
 editUSBsettings(fileName)
 
+print(fileName)
+
 print("----------------------------------------------- Compilation setup [ END ]")
 
 env.AddPostAction("upload", buildPostAction)
