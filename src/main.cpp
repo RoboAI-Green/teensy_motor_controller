@@ -15,10 +15,13 @@
 #define x_max 8
 #define x_min 9
 
-#define z_max_led 17
-#define z_min_led 18
-#define x_max_led 19
-#define x_min_led 20
+#define z_max_led 14
+#define z_min_led 15
+#define x_max_led 16
+#define x_min_led 17
+
+#define sick_output 18
+#define sick_toggle 12
 
 #define powled 13
 
@@ -31,6 +34,7 @@ Bounce2::Button z_max_bounce = Bounce2::Button();
 Bounce2::Button z_min_bounce = Bounce2::Button();
 Bounce2::Button x_max_bounce = Bounce2::Button();
 Bounce2::Button x_min_bounce = Bounce2::Button();
+Bounce2::Button sick_bounce = Bounce2::Button();
 
 String command;
 String axisCmd;
@@ -42,30 +46,23 @@ int powledDir = 0;
 
 void home(String axis)
 {
-    // Serial.print("Homing axis ");
-    // Serial.println(axis);
-    // int limitPin = -1;
     int distance = -1000000000;
     AccelStepper motor;
 
     if (axis.equals("z"))
     {
         motor = stepperZ;
-        // limitPin = z_max;
         distance = distance * -1;
     }
     else if (axis.equals("x"))
     {
         motor = stepperX;
-        // limitPin = x_min;
     }
 
     delay(500);
 
     Serial.print("Moving home");
     Serial.print("\n");
-    // Serial.print(distance);
-    // delay(500);
     motor.move(0);
     motor.stop();
     motor.setCurrentPosition(0);
@@ -74,8 +71,9 @@ void home(String axis)
     {
         z_max_bounce.update();
         x_min_bounce.update();
+        sick_bounce.update();
 
-        if ((axis.equals('z') && (z_max_bounce.rose() || z_max_bounce.isPressed())) || (axis.equals('x') && (x_min_bounce.rose()  || x_min_bounce.isPressed())))
+        if ((axis.equals('z') && (z_max_bounce.rose() || z_max_bounce.isPressed() || sick_bounce.rose() || sick_bounce.isPressed())) || (axis.equals('x') && (x_min_bounce.rose()  || x_min_bounce.isPressed())))
         {
             break;
         }
@@ -100,6 +98,8 @@ void home(String axis)
     // Serial.print("\n");
     Serial.print("Homing complete!\r");
 }
+
+
 
 void motion(String axis, String direction, int distance)
 {
@@ -126,7 +126,8 @@ void motion(String axis, String direction, int distance)
         {
             z_max_bounce.update();
             z_min_bounce.update();
-            if((direction.equals('m') && (z_min_bounce.isPressed() || z_min_bounce.rose()) ) || (direction.equals('p') && (z_max_bounce.rose() || z_max_bounce.isPressed())) || stepperZ.distanceToGo() == 0)
+            sick_bounce.update();
+            if((direction.equals('m') && (z_min_bounce.isPressed() || z_min_bounce.rose()) ) || (direction.equals('p') && (z_max_bounce.rose() || z_max_bounce.isPressed() || sick_bounce.rose() || sick_bounce.isPressed()) ) || stepperZ.distanceToGo() == 0)
             {
                 // stepperZ.stop();
                 moving = false;
@@ -137,7 +138,7 @@ void motion(String axis, String direction, int distance)
                 stepperZ.run();
             }
         }
-        stepperZ.setCurrentPosition(0);
+        stepperZ.setCurrentPosition(stepperZ.currentPosition());
     }
     else if (axis.equals("x"))
     {
@@ -164,44 +165,12 @@ void motion(String axis, String direction, int distance)
             }
         }
 
-        stepperX.setCurrentPosition(0);
+        stepperX.setCurrentPosition(stepperX.currentPosition());
     }
 
     delay(100);
 
     Serial.print("Movement complete.\r");
-}
-
-void warmup()
-{
-    home('z');
-    home('x');
-    Serial.print("Z axis position:\t");
-    Serial.print(stepperZ.currentPosition());
-    Serial.print("\nX axis position:\t");
-    Serial.print(stepperX.currentPosition());
-    motion('z', 'm', 6500000);
-    motion('x', 'p', 6500000);
-    Serial.print("\n\nZ axis position:\t");
-    Serial.print(stepperZ.currentPosition());
-    Serial.print("\nX axis position:\t");
-    Serial.print(stepperX.currentPosition());
-    Serial.print("\r");
-}
-
-void serialTest()
-{
-    Serial.print("Testing serial...\n");
-    for (int i = 0; i < 10; i++)
-    {
-        Serial.print(i);
-        digitalWrite(powled, LOW);
-        delay(250);
-        digitalWrite(powled, HIGH);
-        delay(250);
-        Serial.print("\n");
-    }
-    Serial.print("Test complete...\r");
 }
 
 void get_stepperx_pos()
@@ -231,6 +200,68 @@ void x_min_led_int()
     digitalWrite(x_min_led, digitalRead(x_min));
 }
 
+void zMove(String direction, int distance){
+    bool moving = true;
+    if (direction.equals('m'))
+    {
+        distance = -distance;
+    }
+
+    stepperZ.move(distance);
+    while (moving)
+    {
+        z_max_bounce.update();
+        z_min_bounce.update();
+        sick_bounce.update();
+        if((direction.equals('m') && (z_min_bounce.isPressed() || z_min_bounce.rose()) ) || (direction.equals('p') && (z_max_bounce.rose() || z_max_bounce.isPressed() || sick_bounce.rose() || sick_bounce.isPressed()) ) || stepperZ.distanceToGo() == 0)
+        {
+            // stepperZ.stop();
+            moving = false;
+            break;
+        }
+        else
+        {
+            stepperZ.run();
+        }
+    }
+    stepperZ.setCurrentPosition(stepperZ.currentPosition());
+    delay(100);
+}
+
+void z_focus(){
+    // Move Z to bottom
+    Serial.println("Move Z axis to lower");
+    zMove('m', 20000);
+    delay(500);
+    Serial.println("Move Z axis to top");
+    zMove('p',10000000);
+    delay(500);
+    Serial.println("Move Z axis down 2000 steps");
+    zMove('m',2000);
+    stepperZ.setMaxSpeed(1000);
+    stepperZ.setAcceleration(100);
+    delay(500);
+    Serial.println("Move Z axis to top");
+    zMove('p',10000000);
+    delay(500);
+    Serial.println("Move Z axis down 2000 steps");
+    zMove('m',2000);
+    stepperZ.setMaxSpeed(100);
+    stepperZ.setAcceleration(100);
+    delay(500);
+    Serial.println("Move Z axis to top");
+    zMove('p',10000000);
+    delay(1000);
+    // Serial.print("Focus completed.\r");
+    Serial.println("Focus completed!");
+    delay(100);
+    Serial.println("KEKKONEN");
+}
+
+void laser_toggle(){
+    digitalWrite(sick_toggle, !digitalRead(sick_toggle));
+}
+
 void setup()
 {
     Serial.begin(9600);
@@ -239,11 +270,13 @@ void setup()
     z_min_bounce.attach(z_min, INPUT_PULLUP);
     x_max_bounce.attach(x_max, INPUT_PULLUP);
     x_min_bounce.attach(x_min, INPUT_PULLUP);
+    sick_bounce.attach(sick_output, INPUT_PULLUP);
 
     z_max_bounce.interval(debounce_interval);
     z_min_bounce.interval(debounce_interval);
     x_max_bounce.interval(debounce_interval);
     x_min_bounce.interval(debounce_interval);
+    sick_bounce.interval(debounce_interval);
 
     attachInterrupt(digitalPinToInterrupt(z_max), z_max_led_int, CHANGE);
     attachInterrupt(digitalPinToInterrupt(z_min), z_min_led_int, CHANGE);
@@ -254,6 +287,10 @@ void setup()
     pinMode(z_min_led, OUTPUT);
     pinMode(x_max_led, OUTPUT);
     pinMode(x_min_led, OUTPUT);
+
+    pinMode(sick_toggle, OUTPUT);
+
+    digitalWrite(sick_toggle, HIGH);
 
     pinMode(powled, OUTPUT);
 
@@ -272,26 +309,30 @@ void loop()
 {
     // analogWrite(powled,powledPWM);
     digitalWrite(powled, HIGH);
-    if (Serial.available())
+    
+    if(Serial.available())
     {
         command = Serial.readStringUntil('\n');
         command.trim();
         // Serial.println(Serial.read());
-        if (command.equals("warmup"))
-        {
-            warmup();
-        }
-        else if (command.equals("serialtest"))
-        {
-            serialTest();
-        }
-        else if (command.equals("posx"))
+        if (command.equals("posx"))
         {
             get_stepperx_pos();
         }
         else if (command.equals("posz"))
         {
             get_stepperz_pos();
+        }
+        else if (command.equals("zfocus"))
+        {
+            z_focus();
+            delay(100);
+            stepperZ.setMaxSpeed(4000);
+            stepperZ.setAcceleration(400);
+        }
+        else if (command.equals("lasertoggle")){
+            laser_toggle();
+            delay(100);
         }
         else
         {
