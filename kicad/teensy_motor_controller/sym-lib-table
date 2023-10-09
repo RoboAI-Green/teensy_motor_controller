@@ -1,3 +1,4 @@
 (sym_lib_table
-  (lib (name "teensy_motor_controller-rescue")(type "Legacy")(uri "${KIPRJMOD}/teensy_motor_controller-rescue.lib")(options "")(descr ""))
+  (lib (name "teensy_motor_controller-rescue")(type "KiCad")(uri "${KIPRJMOD}/teensy_motor_controller-rescue.kicad_sym")(options "")(descr ""))
+  (lib (name "teensy")(type "KiCad")(uri "${KIPRJMOD}/teensy_library/teensy.kicad_sym")(options "")(descr ""))
 )

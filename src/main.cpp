@@ -23,6 +23,8 @@
 #define sick_output 18
 #define sick_toggle 12
 
+#define pulse_bnc 19
+
 #define powled 13
 
 #define debounce_interval 25 // In milliseconds
@@ -41,8 +43,14 @@ String axisCmd;
 String directionCmd;
 int distanceCmd;
 
+String accelCmd;
+String speedCmd;
+
 int powledPWM = 128;
 int powledDir = 0;
+
+int pulseCount = 0;
+
 
 /// @brief Home a specific axis. Accepted values are X and Z
 /// @param axis
@@ -183,6 +191,7 @@ void z_min_led_int() { digitalWrite(z_min_led, digitalRead(z_min)); }
 void x_max_led_int() { digitalWrite(x_max_led, digitalRead(x_max)); }
 void x_min_led_int() { digitalWrite(x_min_led, digitalRead(x_min)); }
 
+
 void z_focus()
 {
     // Move Z to bottom
@@ -216,6 +225,13 @@ void z_focus()
 
 void laser_toggle() { digitalWrite(sick_toggle, !digitalRead(sick_toggle)); }
 
+void pulse_bnc_interrupt() { 
+    if(digitalRead(pulse_bnc)==HIGH){
+        pulseCount++;
+    }
+
+}
+
 void setup()
 {
     Serial.begin(9600);
@@ -236,6 +252,8 @@ void setup()
     attachInterrupt(digitalPinToInterrupt(z_min), z_min_led_int, CHANGE);
     attachInterrupt(digitalPinToInterrupt(x_max), x_max_led_int, CHANGE);
     attachInterrupt(digitalPinToInterrupt(x_min), x_min_led_int, CHANGE);
+
+    attachInterrupt(digitalPinToInterrupt(pulse_bnc),pulse_bnc_interrupt, CHANGE);
 
     pinMode(z_max_led, OUTPUT);
     pinMode(z_min_led, OUTPUT);
@@ -266,6 +284,7 @@ void loop()
     {
         command = Serial.readStringUntil('\n');
         command.trim();
+
         if (command.equals("posx"))
         {
             get_stepperx_pos();
@@ -285,6 +304,34 @@ void loop()
         {
             laser_toggle();
             delay(100);
+        }
+        else if(command.equals("pulsecount"))
+        {
+            Serial.print("Pulse count: ");
+            Serial.println(pulseCount);
+
+            Serial.print("BNC state: ");
+            if(digitalRead(pulse_bnc)==HIGH){
+                Serial.println("High");
+            }
+            else{
+                Serial.println("Low");
+            }
+        }
+        else if (command.equals("resetpulse"))
+        {
+            pulseCount=0;
+        }
+        else if (command.indexOf("speed")==0){
+            // speed-<acceleration>x<speed>
+            
+            accelCmd = command.substring(6,command.indexOf("x"));
+            speedCmd = command.substring(command.indexOf("x")+1,command.length());
+
+            Serial.println(accelCmd);
+            Serial.println(speedCmd);
+            stepperX.setAcceleration(accelCmd.toInt());
+            stepperX.setMaxSpeed(speedCmd.toInt());
         }
         else
         {
@@ -306,8 +353,8 @@ void loop()
             }
             else
             {
-                Serial.print(command);
-                Serial.print("Unknown command!\r");
+                Serial.println(command);
+                Serial.println("Unknown command!\r");
             }
         }
     }
