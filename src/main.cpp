@@ -342,7 +342,7 @@ void loop()
             Serial.print("\n\tMax acceleration: ");
             Serial.print(stepperX.acceleration());
             Serial.print("\n\nStepper Z");
-            Serial.print("\tMax speed: ");
+            Serial.print("\n\tMax speed: ");
             Serial.print(stepperZ.maxSpeed());
             Serial.print("\n\tMax acceleration: ");
             Serial.print(stepperZ.acceleration());
