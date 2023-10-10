@@ -308,13 +308,13 @@ void loop()
         else if(command.equals("pulsecount"))
         {
             Serial.print("Pulse count: ");
-            Serial.println(pulseCount);
-            Serial.print("BNC State: ");
+            Serial.print(pulseCount);
+            Serial.print("\nBNC State: ");
             if(digitalRead(pulse_bnc)==HIGH){
-                Serial.println("High");
+                Serial.print("High");
             }
             else{
-                Serial.println("Low");
+                Serial.print("Low");
             }
             Serial.print("\r");
         }
@@ -336,16 +336,16 @@ void loop()
         }
         else if (command.equals("getspeed")){
             
-            Serial.println("Stepper X");
+            Serial.print("Stepper X\n");
             Serial.print("\tMax speed: ");
-            Serial.println(stepperX.maxSpeed());
-            Serial.print("\tMax acceleration: ");
-            Serial.println(stepperX.acceleration());
-            Serial.println("\nStepper Z");
+            Serial.print(stepperX.maxSpeed());
+            Serial.print("\n\tMax acceleration: ");
+            Serial.print(stepperX.acceleration());
+            Serial.print("\n\nStepper Z");
             Serial.print("\tMax speed: ");
-            Serial.println(stepperZ.maxSpeed());
-            Serial.print("\tMax acceleration: ");
-            Serial.println(stepperZ.acceleration());
+            Serial.print(stepperZ.maxSpeed());
+            Serial.print("\n\tMax acceleration: ");
+            Serial.print(stepperZ.acceleration());
             Serial.print("\r");
         }
         else
@@ -368,8 +368,8 @@ void loop()
             }
             else
             {
-                Serial.println(command);
-                Serial.println("Unknown command!\r");
+                Serial.print(command);
+                Serial.print("\nUnknown command!\r");
             }
         }
     }
