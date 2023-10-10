@@ -43,14 +43,13 @@ String axisCmd;
 String directionCmd;
 int distanceCmd;
 
-String accelCmd;
-String speedCmd;
+int accelCmd;
+int speedCmd;
 
 int powledPWM = 128;
 int powledDir = 0;
 
 int pulseCount = 0;
-
 
 /// @brief Home a specific axis. Accepted values are X and Z
 /// @param axis
@@ -279,6 +278,7 @@ void setup()
 void loop()
 {
     digitalWrite(powled, HIGH);
+    
 
     if (Serial.available())
     {
@@ -309,14 +309,14 @@ void loop()
         {
             Serial.print("Pulse count: ");
             Serial.println(pulseCount);
-
-            Serial.print("BNC state: ");
+            Serial.print("BNC State: ");
             if(digitalRead(pulse_bnc)==HIGH){
                 Serial.println("High");
             }
             else{
                 Serial.println("Low");
             }
+            Serial.print("\r");
         }
         else if (command.equals("resetpulse"))
         {
@@ -324,14 +324,29 @@ void loop()
         }
         else if (command.indexOf("speed")==0){
             // speed-<acceleration>x<speed>
-            
-            accelCmd = command.substring(6,command.indexOf("x"));
-            speedCmd = command.substring(command.indexOf("x")+1,command.length());
 
-            Serial.println(accelCmd);
-            Serial.println(speedCmd);
-            stepperX.setAcceleration(accelCmd.toInt());
-            stepperX.setMaxSpeed(speedCmd.toInt());
+            accelCmd = command.substring(6,command.indexOf("x")).toInt();
+            speedCmd = command.substring(command.indexOf("x")+1,command.length()).toInt();
+
+            if(accelCmd==0) { accelCmd=400; }
+            if(speedCmd==0) { speedCmd=4000; }
+            
+            stepperX.setAcceleration(accelCmd);
+            stepperX.setMaxSpeed(speedCmd);
+        }
+        else if (command.equals("getspeed")){
+            
+            Serial.println("Stepper X");
+            Serial.print("\tMax speed: ");
+            Serial.println(stepperX.maxSpeed());
+            Serial.print("\tMax acceleration: ");
+            Serial.println(stepperX.acceleration());
+            Serial.println("\nStepper Z");
+            Serial.print("\tMax speed: ");
+            Serial.println(stepperZ.maxSpeed());
+            Serial.print("\tMax acceleration: ");
+            Serial.println(stepperZ.acceleration());
+            Serial.print("\r");
         }
         else
         {
