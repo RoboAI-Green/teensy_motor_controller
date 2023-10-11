@@ -364,6 +364,7 @@ void loop()
         else if (command.equals("resetpulse"))
         {
             pulseCount=0;
+            Serial.println("Pulse count reset.");
         }
         else if (command.indexOf("speed")==0){
             // speed-<acceleration>x<speed>
