@@ -37,6 +37,7 @@ Bounce2::Button z_min_bounce = Bounce2::Button();
 Bounce2::Button x_max_bounce = Bounce2::Button();
 Bounce2::Button x_min_bounce = Bounce2::Button();
 Bounce2::Button sick_bounce = Bounce2::Button();
+Bounce2::Button bnc_bounce = Bounce2::Button();
 
 String command;
 String axisCmd;
@@ -50,6 +51,12 @@ int powledPWM = 128;
 int powledDir = 0;
 
 int pulseCount = 0;
+
+int linBlanks = 0;
+int linIniMove = 0;
+int linShots = 0;
+int linMove = 0;
+int linCount = 0;
 
 /// @brief Home a specific axis. Accepted values are X and Z
 /// @param axis
@@ -181,6 +188,27 @@ void motion(String axis, String direction, int distance)
     Serial.print("Movement complete.\r");
 }
 
+void linmotion(int distance)
+{
+    bool moving = true;
+
+    stepperX.move(distance);
+    while (moving)
+    {
+        x_max_bounce.update();
+        x_min_bounce.update();
+        if (((x_max_bounce.rose() || x_max_bounce.isPressed())) || stepperX.distanceToGo() == 0)
+        {
+            moving = false;
+            break;
+        }
+        else
+        {
+            stepperX.run();
+        }
+    }
+}
+
 void get_stepperx_pos() { Serial.println(stepperX.currentPosition()); }
 
 void get_stepperz_pos() { Serial.println(stepperZ.currentPosition()); }
@@ -231,6 +259,20 @@ void pulse_bnc_interrupt() {
 
 }
 
+void getSpeed(){
+    Serial.print("Stepper X\n");
+    Serial.print("\tMax speed: ");
+    Serial.print(stepperX.maxSpeed());
+    Serial.print("\n\tMax acceleration: ");
+    Serial.print(stepperX.acceleration());
+    Serial.print("\n\nStepper Z");
+    Serial.print("\n\tMax speed: ");
+    Serial.print(stepperZ.maxSpeed());
+    Serial.print("\n\tMax acceleration: ");
+    Serial.print(stepperZ.acceleration());
+    Serial.print("\r");
+}
+
 void setup()
 {
     Serial.begin(9600);
@@ -240,12 +282,14 @@ void setup()
     x_max_bounce.attach(x_max, INPUT_PULLUP);
     x_min_bounce.attach(x_min, INPUT_PULLUP);
     sick_bounce.attach(sick_output, INPUT_PULLUP);
+    // bnc_bounce.attach(pulse_bnc,INPUT_PULLUP);
 
     z_max_bounce.interval(debounce_interval);
     z_min_bounce.interval(debounce_interval);
     x_max_bounce.interval(debounce_interval);
     x_min_bounce.interval(debounce_interval);
     sick_bounce.interval(debounce_interval);
+    // bnc_bounce.interval(1);
 
     attachInterrupt(digitalPinToInterrupt(z_max), z_max_led_int, CHANGE);
     attachInterrupt(digitalPinToInterrupt(z_min), z_min_led_int, CHANGE);
@@ -264,8 +308,8 @@ void setup()
 
     pinMode(powled, OUTPUT);
 
-    stepperX.setMaxSpeed(4000);
-    stepperX.setAcceleration(400);
+    stepperX.setMaxSpeed(50000);
+    stepperX.setAcceleration(500000);
 
     stepperZ.setMaxSpeed(4000);
     stepperZ.setAcceleration(400);
@@ -279,7 +323,6 @@ void loop()
 {
     digitalWrite(powled, HIGH);
     
-
     if (Serial.available())
     {
         command = Serial.readStringUntil('\n');
@@ -316,7 +359,7 @@ void loop()
             else{
                 Serial.print("Low");
             }
-            Serial.print("\r");
+            Serial.print("\n\n\r");
         }
         else if (command.equals("resetpulse"))
         {
@@ -333,20 +376,45 @@ void loop()
             
             stepperX.setAcceleration(accelCmd);
             stepperX.setMaxSpeed(speedCmd);
+            getSpeed();
+
         }
         else if (command.equals("getspeed")){
+            getSpeed();
+        }
+        else if (command.indexOf("linear")==0){
+            pulseCount=0;
+            //linear-BL<blanks>-IM<initial move>-SH<shots before moving>-MO<movement>-CO<count>
             
-            Serial.print("Stepper X\n");
-            Serial.print("\tMax speed: ");
-            Serial.print(stepperX.maxSpeed());
-            Serial.print("\n\tMax acceleration: ");
-            Serial.print(stepperX.acceleration());
-            Serial.print("\n\nStepper Z");
-            Serial.print("\n\tMax speed: ");
-            Serial.print(stepperZ.maxSpeed());
-            Serial.print("\n\tMax acceleration: ");
-            Serial.print(stepperZ.acceleration());
-            Serial.print("\r");
+            linBlanks = command.substring(command.indexOf("-BL")+3,command.indexOf("-IM")).toInt();
+            linIniMove = command.substring(command.indexOf("-IM")+3, command.indexOf("-SH")).toInt();
+            linShots = command.substring(command.indexOf("-SH")+3, command.indexOf("-MO")).toInt();
+            linMove = command.substring(command.indexOf("-MO")+3, command.indexOf("-CO")).toInt();
+            linCount = command.substring(command.indexOf("-CO")+3, command.length()).toInt();
+
+            int curMove = 0;
+            int curCount = 0;
+            bool warm = false;
+
+            while (curCount<linCount)
+            {
+                if (warm)
+                {
+                    curMove = (pulseCount-(linBlanks+curCount*linShots));
+                    
+                    if (curMove==linShots)
+                    {
+                        linmotion(linMove);
+                        curCount++;
+                    }
+                }
+                else if (pulseCount==linBlanks){
+                    warm = true;
+                    linmotion(linIniMove);
+                }
+                delay(1);
+            }
+            Serial.println("Linear completed");
         }
         else
         {
@@ -369,7 +437,7 @@ void loop()
             else
             {
                 Serial.print(command);
-                Serial.print("\nUnknown command!\r");
+                Serial.println("\nUnknown command!\n\r");
             }
         }
     }
