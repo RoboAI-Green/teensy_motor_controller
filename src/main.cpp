@@ -415,7 +415,7 @@ void loop()
                 }
                 delay(1);
             }
-            Serial.println("Linear completed");
+            Serial.println("Linear completed\n\r");
         }
         else
         {
