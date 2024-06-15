@@ -1,51 +1,30 @@
 #include <Arduino.h>
-#include <AccelStepper.h>
 #include <Bounce2.h>
+#include <AccelStepper.h>
+#include "Command.h"
+#include "optoNCDT.h"
 
-#define PCUSB_SERIAL Serial
-#define OPTO_SERIAL Serial1
+// Pins 0 and 1 reserved for Serial1, optoNCDT communication
 
-#define TOO_MUCH_DATA   262075
-#define NO_PEAK         262076
-#define PEAK_FRONT      262077
-#define PEAK_AFTER      262078
-#define GLOBAL_ERROR    262080
-#define PEAK_WIDE       262081
-#define LASER_OFF       262082
+// Setting pins
+#define x_pulse 2
+#define x_direction 3
+#define x_min 4
+#define x_max 5
 
-#define z_pulse         0
-#define z_direction     1
-#define z_enable        2
+#define y_pulse 6
+#define y_direction 7
+#define y_min 8
+#define y_max 9
 
-#define x_pulse         3
-#define x_direction     4
-#define x_enable        5
-
-#define y_pulse         10
-#define y_direction     11
-#define y_enable        12
-
-#define z_max           6
-#define z_min           7
-#define x_max           8
-#define x_min           9
-#define y_max           22
-#define y_min           23
-
-#define z_max_led       14
-#define z_min_led       15
-#define x_max_led       19
-#define x_min_led       20
-
-// #define pulse_bnc       19
-
-#define powled          13
-
-#define debounce_ms     25
+#define z_pulse 10
+#define z_direction 11
+#define z_min 12
+#define z_max 13
 
 AccelStepper stepperX(1, x_pulse, x_direction);
+AccelStepper stepperY(1, y_pulse, y_direction);
 AccelStepper stepperZ(1, z_pulse, z_direction);
-AccelStepper stepperY(1,y_pulse, y_direction);
 
 Bounce2::Button z_max_bounce = Bounce2::Button();
 Bounce2::Button z_min_bounce = Bounce2::Button();
@@ -53,413 +32,565 @@ Bounce2::Button x_max_bounce = Bounce2::Button();
 Bounce2::Button x_min_bounce = Bounce2::Button();
 Bounce2::Button y_max_bounce = Bounce2::Button();
 Bounce2::Button y_min_bounce = Bounce2::Button();
-Bounce2::Button sick_bounce = Bounce2::Button();
-Bounce2::Button bnc_bounce = Bounce2::Button();
 
-const int posx = 2090623343;
-const int posz = 2090623345;
-const int posy = 2090623344;
-const int lasertoggle = -1635822754;
-const int pulsecount = 1781759127;
-const int resetpulse = -1903504655;
-const int speed = 274671510;
-const int getspeed = -2066154;
-const int linear_blanks = -1196627846;
-const int linear_initial_move = -43909953;
-const int linear_shots = 374222480;
-const int linear_move_x = -761836275;
-const int linear_move_y = -761836274;
-const int linear_columns = 588159712;
-const int linear_rows = 1442967786;
-const int move = 2090515612;
-const int optom = 269944500;
-const int optos = 269944506;
+// Laser pulse BNC connection
+#define laser_bnc 14
+unsigned long pulseCount = 0;
 
-const int MR = 100;
-int sender = 1;
+// Function hashes for switch structure.
+#define hash_posx 2090623343
+#define hash_posz 2090623345
+#define hash_posy 2090623344
+#define hash_lasertoggle -1635822754
+#define hash_pulsecount 1781759127
+#define hash_resetpulse -1903504655
+#define hash_speed 274671510
+#define hash_getspeed -2066154
+#define hash_grid 2090302827
+#define hash_grid_blanks -293840475
+#define hash_grid_initial_move 1967809066
+#define hash_grid_shots -1810979237
+#define hash_grid_move_x 140951096
+#define hash_grid_move_y 140951097
+#define hash_grid_columns 315371883
+#define hash_grid_rows -2007164075
+#define hash_move 2090515612
+#define hash_optom 269944500
+#define hash_optos 269944506
+#define hash_optoc 269944490
+#define hash_help 2090324718
+#define hash_createCmd 2096566157
+#define hash_lim 193498183
 
-String param[MR];
+CmdParse parser = CmdParse();
+optoNCDT epsilon = optoNCDT();
 
-void resetArray() {
-  for (int i = 0; i < MR; i++) {
-    param[i] = ""; // Set each element to an empty string
-  }
-}
+bool optoLaser = true;
 
-int splitString(String str, char delimiter) {
-  int partIndex = 0; // Index to keep track of the current part
-  int lastIndex = 0; // Index to keep track of the last split position
-  
-  // Iterate over each character in the string
-  for (uint i = 0; i < str.length(); i++) {
-    // If the current character is the delimiter or the end of the string
-    if (str.charAt(i) == delimiter || i == str.length() - 1) {
-      // Extract the part between the last split position and the current position
-      param[partIndex++] = str.substring(lastIndex, i + 1);
-      
-      // Update the last split position
-      lastIndex = i + 1;
-      
-      // If the maximum number of parts has been reached, break out of the loop
-      if (partIndex >= MR) {
+unsigned long grid_blanks = 0;
+int grid_ini_move = 0;
+int grid_ppp = 0;
+int grid_mx = 0;
+int grid_my = 0;
+int grid_cols = 0;
+int grid_rows = 0;
+
+void usagePrint(int cmdHash)
+{
+    switch (cmdHash)
+    {
+    case hash_posx:
+        Serial.println("Get and print the step count for axis X");
         break;
-      }
+    case hash_posy:
+        Serial.println("Get and print the step count for axis Y");
+        break;
+    case hash_posz:
+        Serial.println("Get and print the step count for axis Z");
+        break;
+    case hash_lasertoggle:
+        Serial.println("Toggle laser");
+        break;
+    case hash_pulsecount:
+        Serial.println("Pulse count");
+        break;
+    case hash_resetpulse:
+        Serial.println("Reset pulses");
+        break;
+    case hash_speed:
+        Serial.println("Set speed");
+        Serial.println("Usage:\n\tspeed a xxxx yyyy");
+        Serial.println("Where:\n\ta = axis (x,y,z)\n\txxxx = Acceleration\n\tyyyy = Max speed");
+        break;
+    case hash_getspeed:
+        Serial.println("Get speed information");
+        break;
+    case hash_grid_blanks:
+        Serial.println("How many blanks before moving the sample");
+        Serial.println("Usage:\n\tgrid_blanks n");
+        Serial.println("Where:\n\tn = Blank count");
+        break;
+    case hash_grid_initial_move:
+        Serial.println("How much to move after blanks");
+        Serial.println("Usage:\n\tgrid_initial_move nnnn");
+        Serial.println("Where:\n\tnnnn = Step count the X axis moves, after set blank count received.");
+        break;
+    case hash_grid_shots:
+        Serial.println("How many shots on a single point");
+        Serial.println("Usage:\n\tgrid_shots nnnn");
+        Serial.println("Where:\n\tnnnn = Step count the X axis moves, after set blank count received.");
+        break;
+    case hash_grid_move_x:
+        Serial.println("How many steps to move on X axis after shots");
+        break;
+    case hash_grid_move_y:
+        Serial.println("How many steps to move when changing row");
+        break;
+    case hash_grid_columns:
+        Serial.println("How many columns (x axis)");
+        break;
+    case hash_grid_rows:
+        Serial.println("How many rows (y axis)");
+        break;
+    case hash_move:
+        Serial.println("Move an axis");
+        Serial.println("Usage:\n\tmove a nnnn");
+        Serial.println("Where:\n\ta = axis (x,y,z)\n\tnnnn = stepper count");
+        break;
+    case hash_optom:
+        Serial.println("Start outputing OptoNCDT data.");
+        break;
+    case hash_optos:
+        Serial.println("This would stop outputing OptoNCDT data, if it was displaying.");
+        break;
+    default:
+        break;
     }
-  }
-  
-  // Return the number of split parts
-  return partIndex;
 }
 
-
-struct Command {
-    String name;
-    int nameHash;
-    String parameters;
-};
-
-int hash(String str){
-    int hash = 5381;
-    int c;
-
-    const char *cstr = str.c_str();
-
-    while ((c=*cstr++)){
-        hash = ((hash << 5) + hash) +c;
-    }
-
-    return hash;
+void func_help()
+{
+    usagePrint(hash_posx);
+    usagePrint(hash_posz);
+    usagePrint(hash_posy);
+    usagePrint(hash_lasertoggle);
+    usagePrint(hash_pulsecount);
+    usagePrint(hash_resetpulse);
+    usagePrint(hash_speed);
+    usagePrint(hash_getspeed);
+    usagePrint(hash_grid_blanks);
+    usagePrint(hash_grid_initial_move);
+    usagePrint(hash_grid_shots);
+    usagePrint(hash_grid_move_x);
+    usagePrint(hash_grid_move_y);
+    usagePrint(hash_grid_columns);
+    usagePrint(hash_grid_rows);
+    usagePrint(hash_move);
+    usagePrint(hash_optom);
+    usagePrint(hash_optos);
+    usagePrint(hash_optoc);
 }
 
-void removeNewlines(String& str) {
-    str.replace("\r", ""); // Remove carriage return characters
-    str.replace("\n", ""); // Remove newline characters
+void func_createCmd(String cmdString)
+{
+    Serial.println(parser.createCmd(cmdString));
 }
 
-Command parseCommand(String& input) {
-    Command cmd;
-
-    // Find the position of the first space character
-    int spacePos = input.indexOf(' ');
-    removeNewlines(input);
-    // If space is found
-    if (spacePos != -1) {
-        // Extract the command name
-        cmd.name = input.substring(0, spacePos);
-        cmd.nameHash = hash(input.substring(0, spacePos));
-        // Extract the parameters (if any)
-        cmd.parameters = input.substring(spacePos + 1);
-    } else {
-        // If no space is found, the entire input is considered as the command name
-        cmd.name = input;
-        cmd.nameHash = hash(input);
-    }
-
-
-    return cmd;
+void laser_bnc_interrupt()
+{
+    pulseCount++;
 }
 
-void opto_meas(){
-    while(true)
-  {
-    uint8_t lByte, mByte, hByte;
-    // Read the L-Byte packet
-    while (true) {
-      if (OPTO_SERIAL.available() >= 1) {
-        lByte = OPTO_SERIAL.read();
-        if ((lByte >> 6) == 0) { // Check if the flag bits are correct
-          break;
+// void func_move(char axis, int distance)
+void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
+{
+    bool moving = true;
+    stepper.move(distance);
+
+    while (moving)
+    {
+        min_limit.update();
+        max_limit.update();
+
+        if (
+            (distance < 0 && (min_limit.isPressed() || min_limit.rose())) ||
+            (distance > 0 && (max_limit.isPressed() || max_limit.rose())) ||
+            stepper.distanceToGo() == 0)
+        {
+            moving = false;
+            stepper.stop();
+            Serial.println("MEND");
         }
-      }
-    }
-
-    // Read the M-Byte packet
-    while (true) {
-      if (OPTO_SERIAL.available() >= 1) {
-        mByte = OPTO_SERIAL.read();
-        if ((mByte >> 6) == 1) { // Check if the flag bits are correct
-          break;
+        else
+        {
+            stepper.run();
         }
-      }
     }
 
-    // Read the H-Byte packet
-    while (true) {
-      if (OPTO_SERIAL.available() >= 1) {
-        hByte = OPTO_SERIAL.read();
-        if ((hByte >> 6) == 2) { // Check if the flag bits are correct
-          break;
-        }
-      }
-    }
-
-    // Extract the 6 bits of data from each packet
-    uint32_t x = ((hByte & 0x3F) << 12) | ((mByte & 0x3F) << 6) | (lByte & 0x3F);
-
-    if (x >=0 && x<=230604){
-      float calcVal = ((float(x)-98232)/65536)*MR;
-      PCUSB_SERIAL.println(calcVal);
-    }else if (x == TOO_MUCH_DATA){
-      PCUSB_SERIAL.println("Too much data for selected baud rate!");
-    }else if(x == NO_PEAK) {
-      PCUSB_SERIAL.println("No signal coming back!");
-    }else if(x == PEAK_FRONT){
-      PCUSB_SERIAL.println("Object is too close to the sensor!");
-    }else if(x == PEAK_AFTER){
-      PCUSB_SERIAL.println("Object is too far to measure!");
-    }else if(x == GLOBAL_ERROR){
-      PCUSB_SERIAL.println("Measurement value cannot be evaluated, global error");
-    }else if(x == PEAK_WIDE){
-      PCUSB_SERIAL.println("Peak is too wide");
-    }else if(x == LASER_OFF){
-      PCUSB_SERIAL.println("LASER IS OFF");
-    }else{
-      PCUSB_SERIAL.print("Unknown bit: ");
-      PCUSB_SERIAL.println(x);
-    }
-
-    if (PCUSB_SERIAL.available()) {
-      // Read one byte from the serial port
-      String receivedString = PCUSB_SERIAL.readStringUntil('\n');
-      Command cmd = parseCommand(receivedString);
-      
-      if (cmd.nameHash == optos) {
-        PCUSB_SERIAL.println("Stopping output");
-        return;
-      }
-    }
-
-    OPTO_SERIAL.clear();
-  }
+    stepper.stop();
+    stepper.setCurrentPosition(stepper.currentPosition());
 }
 
-/// @brief Move the specified axis, in a set distance to set direction
-/// @param axis
-/// @param direction
-/// @param distance
-// void motion(String axis, String direction, int distance)
-void motion(String parameters)
+void func_speed(char axis, float speed, float acceleration)
+{
+    switch (axis)
+    {
+    case 'x':
+        stepperX.setMaxSpeed(speed);
+        stepperX.setAcceleration(acceleration);
+        Serial.println("SPEEDSET");
+        break;
+    case 'y':
+        stepperY.setMaxSpeed(speed);
+        stepperY.setAcceleration(acceleration);
+        Serial.println("SPEEDSET");
+        break;
+    case 'z':
+        stepperZ.setMaxSpeed(speed);
+        stepperZ.setAcceleration(acceleration);
+        Serial.println("SPEEDSET");
+        break;
+    default:
+        usagePrint(hash_speed);
+        break;
+    }
+}
+
+void func_getspeed(char axis)
+{
+    switch (axis)
+    {
+    case 'x':
+        Serial.print("X axis\tMax Speed ");
+        Serial.print(stepperX.maxSpeed());
+        Serial.print("\tAcceleration ");
+        Serial.println(stepperX.acceleration());
+        break;
+    case 'y':
+        Serial.print("Y axis\tMax Speed ");
+        Serial.print(stepperY.maxSpeed());
+        Serial.print("\tAcceleration ");
+        Serial.println(stepperY.acceleration());
+        break;
+    case 'z':
+        Serial.print("Z axis\tMax Speed ");
+        Serial.print(stepperZ.maxSpeed());
+        Serial.print("\tAcceleration ");
+        Serial.println(stepperZ.acceleration());
+        break;
+    default:
+        usagePrint(hash_speed);
+        break;
+    }
+}
+
+void func_posx() { Serial.println(stepperX.currentPosition()); }
+void func_posy() { Serial.println(stepperY.currentPosition()); }
+void func_posz() { Serial.println(stepperZ.currentPosition()); }
+
+void func_pulsecount()
+{
+    Serial.print("Pulse count: ");
+    Serial.println(pulseCount);
+}
+
+void func_lasertoggle()
 {
 
-    String axis = parameters.substring(0,1);
-    String direction = parameters.substring(1,2);
-    int distance = parameters.substring(2,parameters.length()).toInt();
-
-
-    Serial.print("Axis: ");
-    Serial.print(axis);
-    Serial.print("\t Direction: ");
-    Serial.print(direction);
-    Serial.print("\t Distance: ");
-    Serial.print(distance);
-    Serial.print("\n");
-
-    bool moving = true;
-
-    if (axis.equals("z"))
+    if (optoLaser)
     {
-
-        if (direction.equals('m'))
-        {
-            distance = -distance;
-        }
-
-        stepperZ.move(distance);
-        while (moving)
-        {
-            z_max_bounce.update();
-            z_min_bounce.update();
-            sick_bounce.update();
-            if ((direction.equals('m') && (z_min_bounce.isPressed() || z_min_bounce.rose())) || (direction.equals('p') && (z_max_bounce.rose() || z_max_bounce.isPressed() || sick_bounce.rose() || sick_bounce.isPressed())) || stepperZ.distanceToGo() == 0)
-            {
-                moving = false;
-                break;
-            }
-            else
-            {
-                stepperZ.run();
-            }
-        }
-        stepperZ.setCurrentPosition(stepperZ.currentPosition());
+        epsilon.optoCmd("LASERPOW OFF");
+        optoLaser = false;
     }
-    else if (axis.equals("x"))
+    else
     {
-
-        if (direction.equals('m'))
-        {
-            distance = -distance;
-        }
-
-        stepperX.move(distance);
-        while (moving)
-        {
-            x_max_bounce.update();
-            x_min_bounce.update();
-            if ((direction.equals('m') && (x_min_bounce.isPressed() || x_min_bounce.rose())) || (direction.equals('p') && (x_max_bounce.rose() || x_max_bounce.isPressed())) || stepperX.distanceToGo() == 0)
-            {
-                moving = false;
-                break;
-            }
-            else
-            {
-                stepperX.run();
-            }
-        }
-
-        stepperX.setCurrentPosition(stepperX.currentPosition());
-    }else if(axis.equals("y")){
-        if(direction.equals('m')){distance = -distance;}
-
-        stepperY.move(distance);
-        while(moving){
-            y_max_bounce.update();
-            y_min_bounce.update();
-            if ((direction.equals('m')&&(y_min_bounce.isPressed() || y_min_bounce.rose())) || (direction.equals('p') && (y_max_bounce.rose() ||y_max_bounce.isPressed())) || stepperY.distanceToGo() == 0){
-                moving = false;
-                break;
-            }
-            else{
-                stepperY.run();
-            }
-        }
-
-        stepperY.setCurrentPosition(stepperY.currentPosition());
+        epsilon.optoCmd("LASERPOW FULL");
+        optoLaser = true;
     }
-
-
-    Serial.print("Movement complete.\r");
 }
 
+void func_gridMove()
+{
+    bool warm = false;
+    int curMove, curCount, curRow, curCol;
+    curMove = curCount = curRow = curCol = 0;
+    int linCount = grid_cols * grid_rows;
 
-void func_speed(char axis, int speed, int acceleration){
-    PCUSB_SERIAL.println(axis);
-    PCUSB_SERIAL.println(speed);
-    PCUSB_SERIAL.println(acceleration);
-
+    // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
+    while (curCount < linCount)
+    {
+        Serial.print("Pulse count: ");
+        Serial.print(pulseCount);
+        Serial.print("\tCur count: ");
+        Serial.print(curCount);
+        Serial.print("\tLin count: ");
+        Serial.println(linCount);
+        // Check if warmup shots have been fired.
+        // - Pulse count is continuously increasing value, provided by every single pulse fired
+        //   via the BNC connection from the Quantel Falcon controlbox
+        if (warm)
+        {
+            // From the current pulse count, remove the calculated 3rd pulse for the current position
+            curMove = pulseCount - (grid_blanks + curCount * grid_ppp);
+            if (curMove == grid_ppp)
+            {
+                if (curCol < (grid_cols - 1))
+                {
+                    func_move(stepperX, x_min_bounce, x_max_bounce, grid_mx);
+                    curCol++;
+                }
+                else
+                {
+                    func_move(stepperY, y_min_bounce, y_max_bounce, grid_my);
+                    grid_mx *= -1;
+                    curCol = 0;
+                }
+                curCount++;
+            }
+        }
+        else if (pulseCount == grid_blanks)
+        {
+            warm = true;
+            func_move(stepperX, x_min_bounce, x_max_bounce, grid_ini_move);
+        }
+    }
 }
 
+void func_lim()
+{
+    x_min_bounce.update();
+    x_max_bounce.update();
+    y_min_bounce.update();
+    y_max_bounce.update();
+    z_min_bounce.update();
+    z_max_bounce.update();
 
-void z_max_led_int() { digitalWrite(z_max_led, digitalRead(z_max)); }
-void z_min_led_int() { digitalWrite(z_min_led, digitalRead(z_min)); }
-void x_max_led_int() { digitalWrite(x_max_led, digitalRead(x_max)); }
-void x_min_led_int() { digitalWrite(x_min_led, digitalRead(x_min)); }
+    Serial.print("X MIN STATE: ");
+    Serial.println(x_min_bounce.isPressed() ? "Yes" : "No");
+    Serial.print("X MAX STATE: ");
+    Serial.println(x_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print("Y MIN STATE: ");
+    Serial.println(y_min_bounce.isPressed() ? "Yes" : "No");
+    Serial.print("Y MAX STATE: ");
+    Serial.println(y_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print("Z MIN STATE: ");
+    Serial.println(z_min_bounce.isPressed() ? "Yes" : "No");
+    Serial.print("Z MAX STATE: ");
+    Serial.println(z_max_bounce.isPressed() ? "Yes" : "No");
 
-void setup() {
-    PCUSB_SERIAL.begin(9600);
-    OPTO_SERIAL.begin(921600, SERIAL_8N1);
-    pinMode(powled, OUTPUT);
-    analogWrite(powled, 1);
+    Serial.print(digitalRead(x_min));
+    Serial.println(digitalRead(x_max));
+    Serial.print(digitalRead(y_min));
+    Serial.println(digitalRead(y_max));
+    Serial.print(digitalRead(z_min));
+    Serial.println(digitalRead(z_max));
+}
 
-    z_max_bounce.attach(z_max, INPUT_PULLUP);
-    z_min_bounce.attach(z_min, INPUT_PULLUP);
-    x_max_bounce.attach(x_max, INPUT_PULLUP);
-    x_min_bounce.attach(x_min, INPUT_PULLUP);
-    y_max_bounce.attach(y_max, INPUT_PULLUP);
-    y_min_bounce.attach(y_min, INPUT_PULLUP);
-    // sick_bounce.attach(sick_output, INPUT_PULLUP);
-    // bnc_bounce.attach(pulse_bnc,INPUT_PULLUP);
+void setup()
+{
+    Serial.begin(9600);
+    epsilon.begin(921600, SERIAL_8N1);
+    epsilon.setMeasuringRange(100);
 
-    z_max_bounce.interval(debounce_ms);
-    z_min_bounce.interval(debounce_ms);
-    x_max_bounce.interval(debounce_ms);
-    x_min_bounce.interval(debounce_ms);
-    y_max_bounce.interval(debounce_ms);
-    y_min_bounce.interval(debounce_ms);
-    // sick_bounce.interval(debounce_ms);
-    // bnc_bounce.interval(1);
+    // Attach buttons
+    z_max_bounce.attach(z_max, INPUT_PULLDOWN);
+    z_min_bounce.attach(z_min, INPUT_PULLDOWN);
+    x_max_bounce.attach(x_max, INPUT_PULLDOWN);
+    x_min_bounce.attach(x_min, INPUT_PULLDOWN);
+    y_max_bounce.attach(y_max, INPUT_PULLDOWN);
+    y_min_bounce.attach(y_min, INPUT_PULLDOWN);
 
-    attachInterrupt(digitalPinToInterrupt(x_max), x_max_led_int, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(x_min), x_min_led_int, CHANGE);
+    // Set stepper motor max speed and acceleration
+    stepperX.setMaxSpeed(100000);
+    stepperX.setAcceleration(5000000);
+    stepperY.setMaxSpeed(125000);
+    stepperY.setAcceleration(5000000);
+    stepperZ.setMaxSpeed(4000);
+    stepperZ.setAcceleration(400);
 
-    pinMode(x_max_led,OUTPUT);
-    pinMode(x_min_led,OUTPUT);
-
-    stepperX.setMaxSpeed(500);
-    stepperX.setAcceleration(500);
     stepperX.stop();
+    stepperZ.stop();
+    stepperY.stop();
 
+    // Attach laser pulse BNC as interrupt
+    // pinMode(laser_bnc, INPUT_PULLDOWN);
+    attachInterrupt(digitalPinToInterrupt(laser_bnc), laser_bnc_interrupt, RISING);
 }
 
-void loop() {
+void loop()
+{
+    x_min_bounce.update();
+    x_max_bounce.update();
+    y_min_bounce.update();
+    y_max_bounce.update();
+    z_min_bounce.update();
+    z_max_bounce.update();
 
-    if(PCUSB_SERIAL.available()){
-        String userInput = PCUSB_SERIAL.readStringUntil('\n');
+    if (Serial.available())
+    {
+        String input = Serial.readStringUntil('\n');
+        Command cmd = parser.parseCommand(input);
 
-        Command cmd = parseCommand(userInput);
-        int paramNum = splitString(cmd.parameters, ' ');
-        
         switch (cmd.nameHash)
         {
-            case posx:
-                PCUSB_SERIAL.println("Get and print the step count for axis X");
-                break;
-            case posy:
-                PCUSB_SERIAL.println("Get and print the step count for axis Y");
-                break;
-            case posz:
-                PCUSB_SERIAL.println("Get and print the step count for axis Z");
-                break;
-            case lasertoggle:
-                PCUSB_SERIAL.println("Toggle laser");
-                break;
-            case pulsecount:
-                PCUSB_SERIAL.println("Pulse count");
-                break;
-            case resetpulse:
-                PCUSB_SERIAL.println("Reset pulses");
-                break;
-            case speed:
-                PCUSB_SERIAL.println("Set speed");
-                if(paramNum == 3){
-                    func_speed(param[0].charAt(0), param[1].toInt(), param[2].toInt());
-                }else{
-                    PCUSB_SERIAL.println("Usage: speed axis[char] speed[int] acceleration[int]");
+        case hash_posx:
+            func_posx();
+            break;
+        case hash_posy:
+            func_posy();
+            break;
+        case hash_posz:
+            func_posz();
+            break;
+        case hash_lasertoggle:
+            usagePrint(hash_lasertoggle);
+            break;
+        case hash_pulsecount:
+            func_pulsecount();
+            break;
+        case hash_resetpulse:
+            pulseCount = 0;
+            // usagePrint(hash_resetpulse);
+            break;
+        case hash_speed:
+            if (cmd.paramCount == 3)
+            {
+                char axis = cmd.paramArray[0].charAt(0);
+                float speed = cmd.paramArray[1].toFloat();
+                float acceleration = cmd.paramArray[2].toFloat();
+                func_speed(axis, speed, acceleration);
+            }
+            else
+            {
+                usagePrint(hash_speed);
+            }
+            break;
+        case hash_getspeed:
+            if (cmd.paramCount == 1)
+            {
+                char axis = cmd.paramArray[0].charAt(0);
+                func_getspeed(axis);
+            }
+            else
+            {
+                usagePrint(hash_getspeed);
+            }
+            break;
+        case hash_grid:
+            pulseCount = 0;
+            func_gridMove();
+            break;
+        case hash_grid_blanks:
+            if (cmd.paramCount == 1)
+            {
+                grid_blanks = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_blanks);
+            }
+            break;
+        case hash_grid_initial_move:
+            if (cmd.paramCount == 1)
+            {
+                grid_ini_move = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_initial_move);
+            }
+            break;
+        case hash_grid_shots:
+            if (cmd.paramCount == 1)
+            {
+                grid_ppp = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_shots);
+            }
+            break;
+        case hash_grid_move_x:
+            if (cmd.paramCount == 1)
+            {
+                grid_mx = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_move_x);
+            }
+            break;
+        case hash_grid_move_y:
+            if (cmd.paramCount == 1)
+            {
+                grid_my = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_move_y);
+            }
+            break;
+        case hash_grid_columns:
+            if (cmd.paramCount == 1)
+            {
+                grid_cols = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_columns);
+            }
+            break;
+        case hash_grid_rows:
+            if (cmd.paramCount == 1)
+            {
+                grid_rows = cmd.paramArray[0].toInt();
+            }
+            else
+            {
+                usagePrint(hash_grid_rows);
+            }
+            break;
+        case hash_move:
+            if (cmd.paramCount == 2)
+            {
+                char axis = cmd.paramArray[0].charAt(0);
+                int distance = cmd.paramArray[1].toInt();
+                switch (axis)
+                {
+                case 'x':
+                    func_move(stepperX, x_min_bounce, x_max_bounce, distance);
+                    break;
+                case 'y':
+                    func_move(stepperY, y_min_bounce, y_max_bounce, distance);
+                    break;
+                case 'z':
+                    func_move(stepperZ, z_min_bounce, z_max_bounce, distance);
+                    break;
+                default:
+                    break;
                 }
-                break;
-            case getspeed:
-                PCUSB_SERIAL.println("Get speed information");
-                break;
-            case linear_blanks:
-                PCUSB_SERIAL.println("How many blanks before moving the sample");
-                break;
-            case linear_initial_move:
-                PCUSB_SERIAL.println("How much to move after blanks");
-                break;
-            case linear_shots:
-                PCUSB_SERIAL.println("How many shots on a single point");
-                break;
-            case linear_move_x:
-                PCUSB_SERIAL.println("How many steps to move on X axis after shots");
-                break;
-            case linear_move_y:
-                PCUSB_SERIAL.println("How many steps to move when changing row");
-                break;
-            case linear_columns:
-                PCUSB_SERIAL.println("How many columns (x axis)");
-                break;
-            case linear_rows:
-                PCUSB_SERIAL.println("How many rows (y axis)");
-                break;
-            case move:
-                PCUSB_SERIAL.println("Move an axis");
-                motion(cmd.parameters);
-                break;
-            case optom:
-                PCUSB_SERIAL.println("Start outputing OptoNCDT data.");
-                break;
-            case optos:
-                PCUSB_SERIAL.println("This would stop outputing OptoNCDT data, if it was displaying.");
-                break;
-            default:
-                PCUSB_SERIAL.println("UNKNOWN COMMAND");
-                PCUSB_SERIAL.println(cmd.nameHash);
-                break;
+                // func_move(axis, distance);
+            }
+            else
+            {
+                usagePrint(hash_move);
+            }
+
+            break;
+        case hash_optom:
+            while (true)
+            {
+                float epsiMeas = epsilon.optoMeas();
+                Serial.println(epsiMeas);
+                if (Serial.available())
+                {
+                    String input = Serial.readStringUntil('\n');
+                    cmd = parser.parseCommand(input);
+
+                    if (cmd.nameHash == hash_optos)
+                    {
+                        Serial.println(9876543210);
+                        break;
+                    }
+                }
+            }
+            break;
+        case hash_optoc:
+            Serial.println(epsilon.optoCmd(cmd.parameters));
+            break;
+        case hash_lim:
+            func_lim();
+            break;
+        case hash_help:
+            func_help();
+            break;
+        case hash_createCmd:
+            func_createCmd(cmd.paramArray[0]);
+            break;
+        default:
+            func_createCmd(cmd.name);
+            Serial.println("Unknown command. Use help to see list of commands.");
+            break;
         }
-
     }
-
-    digitalWrite(z_max_led, digitalRead(z_max));
-    digitalWrite(z_min_led, digitalRead(z_min));
-    digitalWrite(x_max_led, digitalRead(x_max));
-    digitalWrite(x_min_led, digitalRead(x_min));
 }
