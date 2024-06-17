@@ -22,9 +22,14 @@
 #define z_min 12
 #define z_max 13
 
-AccelStepper stepperX(1, x_pulse, x_direction);
-AccelStepper stepperY(1, y_pulse, y_direction);
-AccelStepper stepperZ(1, z_pulse, z_direction);
+AccelStepper stepperX(AccelStepper::DRIVER, x_pulse, x_direction);
+AccelStepper stepperY(AccelStepper::DRIVER, y_pulse, y_direction);
+AccelStepper stepperZ(AccelStepper::DRIVER, z_pulse, z_direction);
+
+// How many pulses it takes to move 1 mm
+int stepperX_ppmm = 3200;
+int stepperY_ppmm = 3200;
+int stepperZ_ppmm = 320;
 
 Bounce2::Button z_max_bounce = Bounce2::Button();
 Bounce2::Button z_min_bounce = Bounce2::Button();
@@ -80,68 +85,86 @@ void usagePrint(int cmdHash)
     switch (cmdHash)
     {
     case hash_posx:
-        Serial.println("Get and print the step count for axis X");
+        Serial.println("posx");
+        Serial.println("\tGet and print the step count for axis X");
         break;
     case hash_posy:
-        Serial.println("Get and print the step count for axis Y");
+        Serial.println("posy");
+        Serial.println("\tGet and print the step count for axis Y");
         break;
     case hash_posz:
-        Serial.println("Get and print the step count for axis Z");
+        Serial.println("posz");
+        Serial.println("\tGet and print the step count for axis Z");
         break;
     case hash_lasertoggle:
-        Serial.println("Toggle laser");
+        Serial.println("lasertoggle");
+        Serial.println("\tToggle laser on/off");
         break;
     case hash_pulsecount:
-        Serial.println("Pulse count");
+        Serial.println("pulsecount");
+        Serial.println("\tReturn the current pulse count received from BNC.");
         break;
     case hash_resetpulse:
-        Serial.println("Reset pulses");
+        Serial.println("resetpulse");
+        Serial.println("\tReset pulse count to zero.");
         break;
     case hash_speed:
-        Serial.println("Set speed");
-        Serial.println("Usage:\n\tspeed a xxxx yyyy");
-        Serial.println("Where:\n\ta = axis (x,y,z)\n\txxxx = Acceleration\n\tyyyy = Max speed");
+        Serial.println("speed");
+        Serial.println("\tSet speed");
+        Serial.println("\tUsage:\n\t\tspeed a xxxx yyyy");
+        Serial.println("\tWhere:\n\t\ta = axis (x,y,z)\n\t\txxxx = Acceleration\n\t\tyyyy = Max speed");
         break;
     case hash_getspeed:
-        Serial.println("Get speed information");
+        Serial.println("getspeed");
+        Serial.println("\tGet speed and acceleration information");
         break;
     case hash_grid_blanks:
-        Serial.println("How many blanks before moving the sample");
-        Serial.println("Usage:\n\tgrid_blanks n");
-        Serial.println("Where:\n\tn = Blank count");
+        Serial.println("grid_blanks");
+        Serial.println("\tHow many blanks before moving the sample");
+        Serial.println("\tUsage:\n\t\tgrid_blanks n");
+        Serial.println("\tWhere:\n\t\tn = Blank count");
         break;
     case hash_grid_initial_move:
-        Serial.println("How much to move after blanks");
-        Serial.println("Usage:\n\tgrid_initial_move nnnn");
-        Serial.println("Where:\n\tnnnn = Step count the X axis moves, after set blank count received.");
+        Serial.println("grid_initial_move");
+        Serial.println("\tHow much to move after blanks");
+        Serial.println("\tUsage:\n\t\tgrid_initial_move nnnn");
+        Serial.println("\tWhere:\n\t\tnnnn = How many millimeter's the X axis moves, after set blank count received.");
         break;
     case hash_grid_shots:
-        Serial.println("How many shots on a single point");
-        Serial.println("Usage:\n\tgrid_shots nnnn");
-        Serial.println("Where:\n\tnnnn = Step count the X axis moves, after set blank count received.");
+        Serial.println("grid_shots");
+        Serial.println("\tHow many shots on a single point");
+        Serial.println("\tUsage:\n\t\tgrid_shots nnnn");
+        Serial.println("\tWhere:\n\t\tnnnn = How many millimeter's the X axis moves, after set blank count received.");
         break;
     case hash_grid_move_x:
-        Serial.println("How many steps to move on X axis after shots");
+        Serial.println("grid_move_x");
+        Serial.println("\tHow many millimeter's to move X axis after shots");
         break;
     case hash_grid_move_y:
-        Serial.println("How many steps to move when changing row");
+        Serial.println("grid_move_y");
+        Serial.println("\tHow many millimeter's to move Y axis changing row");
         break;
     case hash_grid_columns:
-        Serial.println("How many columns (x axis)");
+        Serial.println("grid_columns");
+        Serial.println("\tHow many columns (x axis)");
         break;
     case hash_grid_rows:
-        Serial.println("How many rows (y axis)");
+        Serial.println("grid_rows");
+        Serial.println("\tHow many rows (y axis)");
         break;
     case hash_move:
-        Serial.println("Move an axis");
-        Serial.println("Usage:\n\tmove a nnnn");
-        Serial.println("Where:\n\ta = axis (x,y,z)\n\tnnnn = stepper count");
+        Serial.println("move");
+        Serial.println("\tMove an axis");
+        Serial.println("\tUsage:\n\t\tmove a nnnn");
+        Serial.println("\tWhere:\n\t\ta = axis (x,y,z)\n\t\tnnnn = millimeters");
         break;
     case hash_optom:
-        Serial.println("Start outputing OptoNCDT data.");
+        Serial.println("optom");
+        Serial.println("\tStart outputing OptoNCDT data.");
         break;
     case hash_optos:
-        Serial.println("This would stop outputing OptoNCDT data, if it was displaying.");
+        Serial.println("optos");
+        Serial.println("\tThis would stop outputing OptoNCDT data, if it was displaying.");
         break;
     default:
         break;
@@ -357,13 +380,6 @@ void func_lim()
     Serial.println(z_min_bounce.isPressed() ? "Yes" : "No");
     Serial.print("Z MAX STATE: ");
     Serial.println(z_max_bounce.isPressed() ? "Yes" : "No");
-
-    Serial.print(digitalRead(x_min));
-    Serial.println(digitalRead(x_max));
-    Serial.print(digitalRead(y_min));
-    Serial.println(digitalRead(y_max));
-    Serial.print(digitalRead(z_min));
-    Serial.println(digitalRead(z_max));
 }
 
 void setup()
@@ -473,7 +489,7 @@ void loop()
         case hash_grid_initial_move:
             if (cmd.paramCount == 1)
             {
-                grid_ini_move = cmd.paramArray[0].toInt();
+                grid_ini_move = cmd.paramArray[0].toInt() * stepperX_ppmm;
             }
             else
             {
@@ -493,7 +509,7 @@ void loop()
         case hash_grid_move_x:
             if (cmd.paramCount == 1)
             {
-                grid_mx = cmd.paramArray[0].toInt();
+                grid_mx = cmd.paramArray[0].toInt() * stepperX_ppmm;
             }
             else
             {
@@ -503,7 +519,7 @@ void loop()
         case hash_grid_move_y:
             if (cmd.paramCount == 1)
             {
-                grid_my = cmd.paramArray[0].toInt();
+                grid_my = cmd.paramArray[0].toInt() * stepperY_ppmm;
             }
             else
             {
@@ -534,22 +550,21 @@ void loop()
             if (cmd.paramCount == 2)
             {
                 char axis = cmd.paramArray[0].charAt(0);
-                int distance = cmd.paramArray[1].toInt();
+                float distance = cmd.paramArray[1].toFloat();
                 switch (axis)
                 {
                 case 'x':
-                    func_move(stepperX, x_min_bounce, x_max_bounce, distance);
+                    func_move(stepperX, x_min_bounce, x_max_bounce, distance * stepperX_ppmm);
                     break;
                 case 'y':
-                    func_move(stepperY, y_min_bounce, y_max_bounce, distance);
+                    func_move(stepperY, y_min_bounce, y_max_bounce, distance * stepperY_ppmm);
                     break;
                 case 'z':
-                    func_move(stepperZ, z_min_bounce, z_max_bounce, distance);
+                    func_move(stepperZ, z_min_bounce, z_max_bounce, distance * stepperZ_ppmm);
                     break;
                 default:
                     break;
                 }
-                // func_move(axis, distance);
             }
             else
             {
