@@ -85,86 +85,86 @@ void usagePrint(int cmdHash)
     switch (cmdHash)
     {
     case hash_posx:
-        Serial.println("posx");
-        Serial.println("\tGet and print the step count for axis X");
+        Serial.print("posx\n");
+        Serial.print("\tGet and print the step count for axis X\n\n");
         break;
     case hash_posy:
-        Serial.println("posy");
-        Serial.println("\tGet and print the step count for axis Y");
+        Serial.print("posy\n");
+        Serial.print("\tGet and print the step count for axis Y\n\n");
         break;
     case hash_posz:
-        Serial.println("posz");
-        Serial.println("\tGet and print the step count for axis Z");
+        Serial.print("posz\n");
+        Serial.print("\tGet and print the step count for axis Z\n\n");
         break;
     case hash_lasertoggle:
-        Serial.println("lasertoggle");
-        Serial.println("\tToggle laser on/off");
+        Serial.print("lasertoggle\n");
+        Serial.print("\tToggle laser on/off\n\n");
         break;
     case hash_pulsecount:
-        Serial.println("pulsecount");
-        Serial.println("\tReturn the current pulse count received from BNC.");
+        Serial.print("pulsecount\n");
+        Serial.print("\tReturn the current pulse count received from BNC.\n\n");
         break;
     case hash_resetpulse:
-        Serial.println("resetpulse");
-        Serial.println("\tReset pulse count to zero.");
+        Serial.print("resetpulse\n");
+        Serial.print("\tReset pulse count to zero.\n\n");
         break;
     case hash_speed:
-        Serial.println("speed");
-        Serial.println("\tSet speed");
-        Serial.println("\tUsage:\n\t\tspeed a xxxx yyyy");
-        Serial.println("\tWhere:\n\t\ta = axis (x,y,z)\n\t\txxxx = Acceleration\n\t\tyyyy = Max speed");
+        Serial.print("speed\n");
+        Serial.print("\tSet speed\n");
+        Serial.print("\tUsage:\n\t\tspeed a xxxx yyyy\n");
+        Serial.print("\tWhere:\n\t\ta = axis (x,y,z)\n\t\txxxx = Acceleration\n\t\tyyyy = Max speed\n\n");
         break;
     case hash_getspeed:
-        Serial.println("getspeed");
-        Serial.println("\tGet speed and acceleration information");
+        Serial.print("getspeed\n");
+        Serial.print("\tGet speed and acceleration information\n\n");
         break;
     case hash_grid_blanks:
-        Serial.println("grid_blanks");
-        Serial.println("\tHow many blanks before moving the sample");
-        Serial.println("\tUsage:\n\t\tgrid_blanks n");
-        Serial.println("\tWhere:\n\t\tn = Blank count");
+        Serial.print("grid_blanks\n");
+        Serial.print("\tHow many blanks before moving the sample\n");
+        Serial.print("\tUsage:\n\t\tgrid_blanks n\n");
+        Serial.print("\tWhere:\n\t\tn = Blank count\n\n");
         break;
     case hash_grid_initial_move:
-        Serial.println("grid_initial_move");
-        Serial.println("\tHow much to move after blanks");
-        Serial.println("\tUsage:\n\t\tgrid_initial_move nnnn");
-        Serial.println("\tWhere:\n\t\tnnnn = How many millimeter's the X axis moves, after set blank count received.");
+        Serial.print("grid_initial_move\n");
+        Serial.print("\tHow much to move after blanks\n");
+        Serial.print("\tUsage:\n\t\tgrid_initial_move nnnn\n");
+        Serial.print("\tWhere:\n\t\tnnnn = How many millimeter's the X axis moves, after set blank count received.\n\n");
         break;
     case hash_grid_shots:
-        Serial.println("grid_shots");
-        Serial.println("\tHow many shots on a single point");
-        Serial.println("\tUsage:\n\t\tgrid_shots nnnn");
-        Serial.println("\tWhere:\n\t\tnnnn = How many millimeter's the X axis moves, after set blank count received.");
+        Serial.print("grid_shots\n");
+        Serial.print("\tHow many shots on a single point\n");
+        Serial.print("\tUsage:\n\t\tgrid_shots nnnn\n");
+        Serial.print("\tWhere:\n\t\tnnnn = How many millimeter's the X axis moves, after set blank count received.\n\n");
         break;
     case hash_grid_move_x:
-        Serial.println("grid_move_x");
-        Serial.println("\tHow many millimeter's to move X axis after shots");
+        Serial.print("grid_move_x\n");
+        Serial.print("\tHow many millimeter's to move X axis after shots\n\n");
         break;
     case hash_grid_move_y:
-        Serial.println("grid_move_y");
-        Serial.println("\tHow many millimeter's to move Y axis changing row");
+        Serial.print("grid_move_y\n");
+        Serial.print("\tHow many millimeter's to move Y axis changing row\n\n");
         break;
     case hash_grid_columns:
-        Serial.println("grid_columns");
-        Serial.println("\tHow many columns (x axis)");
+        Serial.print("grid_columns\n");
+        Serial.print("\tHow many columns (x axis)\n\n");
         break;
     case hash_grid_rows:
-        Serial.println("grid_rows");
-        Serial.println("\tHow many rows (y axis)");
+        Serial.print("grid_rows\n");
+        Serial.print("\tHow many rows (y axis)\n\n");
         break;
     case hash_move:
-        Serial.println("move");
-        Serial.println("\tMove an axis");
-        Serial.println("\tUsage:\n\t\tmove a nnnn");
-        Serial.println("\tWhere:\n\t\ta = axis (x,y,z)\n\t\tnnnn = millimeters");
+        Serial.print("move\n");
+        Serial.print("\tMove an axis");
+        Serial.print("\tUsage:\n\t\tmove a nnnn");
+        Serial.print("\tWhere:\n\t\ta = axis (x,y,z)\n\t\tnnnn = millimeters\n\n");
         break;
     case hash_optom:
-        Serial.println("optom");
-        Serial.println("\tStart outputing OptoNCDT data.");
+        Serial.print("optom\n");
+        Serial.print("\tStart outputing OptoNCDT data.\n\n");
         break;
     case hash_optos:
-        Serial.println("optos");
-        Serial.println("\tThis would stop outputing OptoNCDT data, if it was displaying.");
+        Serial.print("optos\n");
+        Serial.print("\tThis would stop outputing OptoNCDT data, if it was displaying.\n\n");
         break;
     default:
         break;
@@ -192,19 +192,13 @@ void func_help()
     usagePrint(hash_optom);
     usagePrint(hash_optos);
     usagePrint(hash_optoc);
+    Serial.print("\r");
 }
 
-void func_createCmd(String cmdString)
-{
-    Serial.println(parser.createCmd(cmdString));
-}
+void func_createCmd(String cmdString) { Serial.println(parser.createCmd(cmdString)); }
 
-void laser_bnc_interrupt()
-{
-    pulseCount++;
-}
+void laser_bnc_interrupt() { pulseCount++; }
 
-// void func_move(char axis, int distance)
 void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
 {
     bool moving = true;
@@ -222,7 +216,7 @@ void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Butto
         {
             moving = false;
             stepper.stop();
-            Serial.println("MEND");
+            Serial.print("MEND\r");
         }
         else
         {
@@ -239,23 +233,24 @@ void func_speed(char axis, float speed, float acceleration)
     switch (axis)
     {
     case 'x':
-        stepperX.setMaxSpeed(speed);
-        stepperX.setAcceleration(acceleration);
-        Serial.println("SPEEDSET");
+        stepperX.setMaxSpeed(speed * stepperX_ppmm);
+        stepperX.setAcceleration(acceleration * stepperX_ppmm);
+        Serial.println("X_SPEEDSET");
         break;
     case 'y':
-        stepperY.setMaxSpeed(speed);
-        stepperY.setAcceleration(acceleration);
-        Serial.println("SPEEDSET");
+        stepperY.setMaxSpeed(speed * stepperY_ppmm);
+        stepperY.setAcceleration(acceleration * stepperY_ppmm);
+        Serial.println("Y_SPEEDSET");
         break;
     case 'z':
-        stepperZ.setMaxSpeed(speed);
-        stepperZ.setAcceleration(acceleration);
-        Serial.println("SPEEDSET");
+        stepperZ.setMaxSpeed(speed * stepperZ_ppmm);
+        stepperZ.setAcceleration(acceleration * stepperZ_ppmm);
+        Serial.println("Z_SPEEDSET");
         break;
     default:
         usagePrint(hash_speed);
         break;
+        Serial.print("\r");
     }
 }
 
@@ -265,24 +260,43 @@ void func_getspeed(char axis)
     {
     case 'x':
         Serial.print("X axis\tMax Speed ");
+        Serial.print(stepperX.maxSpeed() / stepperX_ppmm);
+        Serial.print(" mm/s (");
         Serial.print(stepperX.maxSpeed());
+        Serial.print(" steps/s)");
         Serial.print("\tAcceleration ");
-        Serial.println(stepperX.acceleration());
+        Serial.print(stepperX.acceleration() / stepperX_ppmm);
+        Serial.print(" mm/s^2 (");
+        Serial.print(stepperX.acceleration());
+        Serial.println(" steps/s^2)");
         break;
     case 'y':
         Serial.print("Y axis\tMax Speed ");
+        Serial.print(stepperY.maxSpeed() / stepperY_ppmm);
+        Serial.print(" mm/s (");
         Serial.print(stepperY.maxSpeed());
+        Serial.print(" steps/s)");
         Serial.print("\tAcceleration ");
-        Serial.println(stepperY.acceleration());
+        Serial.print(stepperY.acceleration() / stepperY_ppmm);
+        Serial.print(" mm/s^2 (");
+        Serial.print(stepperY.acceleration());
+        Serial.println(" steps/s^2)");
         break;
     case 'z':
         Serial.print("Z axis\tMax Speed ");
+        Serial.print(stepperZ.maxSpeed() / stepperZ_ppmm);
+        Serial.print(" mm/s (");
         Serial.print(stepperZ.maxSpeed());
+        Serial.print(" steps/s)");
         Serial.print("\tAcceleration ");
-        Serial.println(stepperZ.acceleration());
+        Serial.print(stepperZ.acceleration() / stepperZ_ppmm);
+        Serial.print(" mm/s^2 (");
+        Serial.print(stepperZ.acceleration());
+        Serial.println(" steps/s^2)");
         break;
     default:
         usagePrint(hash_speed);
+        Serial.print("\r");
         break;
     }
 }
@@ -369,17 +383,18 @@ void func_lim()
     z_max_bounce.update();
 
     Serial.print("X MIN STATE: ");
-    Serial.println(x_min_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(x_min_bounce.isPressed() ? "Yes\n" : "No\n");
     Serial.print("X MAX STATE: ");
-    Serial.println(x_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(x_max_bounce.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Y MIN STATE: ");
-    Serial.println(y_min_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(y_min_bounce.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Y MAX STATE: ");
-    Serial.println(y_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(y_max_bounce.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Z MIN STATE: ");
-    Serial.println(z_min_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(z_min_bounce.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Z MAX STATE: ");
-    Serial.println(z_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(z_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print("\r");
 }
 
 void setup()
@@ -397,19 +412,15 @@ void setup()
     y_min_bounce.attach(y_min, INPUT_PULLDOWN);
 
     // Set stepper motor max speed and acceleration
-    stepperX.setMaxSpeed(100000);
-    stepperX.setAcceleration(5000000);
-    stepperY.setMaxSpeed(125000);
-    stepperY.setAcceleration(5000000);
-    stepperZ.setMaxSpeed(4000);
-    stepperZ.setAcceleration(400);
+    func_speed('x', 30.0, 1000.0);
+    func_speed('y', 30.0, 1000.0);
+    func_speed('z', 15.0, 1.5);
 
     stepperX.stop();
     stepperZ.stop();
     stepperY.stop();
 
     // Attach laser pulse BNC as interrupt
-    // pinMode(laser_bnc, INPUT_PULLDOWN);
     attachInterrupt(digitalPinToInterrupt(laser_bnc), laser_bnc_interrupt, RISING);
 }
 
@@ -459,6 +470,7 @@ void loop()
             else
             {
                 usagePrint(hash_speed);
+                Serial.print("\r");
             }
             break;
         case hash_getspeed:
@@ -470,6 +482,7 @@ void loop()
             else
             {
                 usagePrint(hash_getspeed);
+                Serial.print("\r");
             }
             break;
         case hash_grid:
@@ -484,6 +497,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_blanks);
+                Serial.print("\r");
             }
             break;
         case hash_grid_initial_move:
@@ -494,6 +508,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_initial_move);
+                Serial.print("\r");
             }
             break;
         case hash_grid_shots:
@@ -504,6 +519,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_shots);
+                Serial.print("\r");
             }
             break;
         case hash_grid_move_x:
@@ -514,6 +530,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_move_x);
+                Serial.print("\r");
             }
             break;
         case hash_grid_move_y:
@@ -524,6 +541,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_move_y);
+                Serial.print("\r");
             }
             break;
         case hash_grid_columns:
@@ -534,6 +552,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_columns);
+                Serial.print("\r");
             }
             break;
         case hash_grid_rows:
@@ -544,6 +563,7 @@ void loop()
             else
             {
                 usagePrint(hash_grid_rows);
+                Serial.print("\r");
             }
             break;
         case hash_move:
@@ -569,6 +589,7 @@ void loop()
             else
             {
                 usagePrint(hash_move);
+                Serial.print("\r");
             }
 
             break;

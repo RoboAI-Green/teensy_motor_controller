@@ -13,35 +13,18 @@
 import os
 import shutil
 Import("env", "projenv")
+
 deviceVID  = "0x1209"
 devicePID  = "0xAD10"
 propName = "Teensy Motor Controller"
-
-board_config = env.BoardConfig()
-
-board_config.update("build.hwids", [
-[deviceVID], #VIDS
-[devicePID] #PIDS
-])
-
-board_config.update("build.usb_product", propName)
-
 deviceName = '{'
 for c in list(propName):
     deviceName += "'{}',".format(c)
 
 deviceName = deviceName[:-1] + "}"
 
-
 # Edit USB device information
-def editUSBsettings(source, target, env):
-    print('Editing USB settings')
-    cpp_path = env['CPPPATH'][0]
-    fileName = "{}\{}".format(cpp_path,'usb_desc.h')
-    fileNameBackup = fileName+".backup"
-    if not os.path.exists(fileNameBackup):
-        shutil.copyfile(fileName, fileNameBackup)
-    print(fileName)
+def editUSBsettings(fileName):
     # Search and replace inside the file
     fHandler = open(fileName, "rt")
     data = fHandler.read()
@@ -57,6 +40,7 @@ def editUSBsettings(source, target, env):
     #close the file
     fHandler.close()
 
+
 # Move back the original file
 def buildPostAction(source, target, env):
     cpp_path = env['CPPPATH'][0]
@@ -65,8 +49,24 @@ def buildPostAction(source, target, env):
 
     if os.path.exists(fileNameBackup):
         shutil.move(fileNameBackup, fileName)
-    shutil.copyfile(".pio/build/tmc/firmware.hex", "teensy_motor_controller.hex")
+    shutil.copyfile(".pio/build/tmc/firmware.hex", "tmc.hex")
+    
+# Before compilation (BEGIN)
+print("\n----------------------------------------------- Compilation setup [BEGIN]\n\n")
+# usb_private.h backup
+#print(env['CPPPATH'][0].split("teensy4")[0])
+cpp_path = env['CPPPATH'][0]
+fileName = "{}\{}".format(cpp_path,'usb_desc.h')
 
-# editUSBsettings()
-env.AddPreAction("buildprog", editUSBsettings)
-# env.AddPostAction("buildprog", buildPostAction)
+# fileName = os.path.sep.join([env['CPPPATH'][1]]+["usb_serial","usb_private.h"])
+fileNameBackup = fileName+".backup"
+if not os.path.exists(fileNameBackup):
+    shutil.copyfile(fileName, fileNameBackup)
+editUSBsettings(fileName)
+
+print(fileName)
+
+print("----------------------------------------------- Compilation setup [ END ]")
+
+env.AddPostAction("upload", buildPostAction)
+env.AddPostAction("buildprog", buildPostAction)
