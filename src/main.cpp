@@ -503,7 +503,7 @@ void loop()
         case hash_grid_initial_move:
             if (cmd.paramCount == 1)
             {
-                grid_ini_move = cmd.paramArray[0].toInt() * stepperX_ppmm;
+                grid_ini_move = cmd.paramArray[0].toFloat() * stepperX_ppmm;
             }
             else
             {
@@ -525,7 +525,7 @@ void loop()
         case hash_grid_move_x:
             if (cmd.paramCount == 1)
             {
-                grid_mx = cmd.paramArray[0].toInt() * stepperX_ppmm;
+                grid_mx = cmd.paramArray[0].toFloat() * stepperX_ppmm;
             }
             else
             {
@@ -536,7 +536,7 @@ void loop()
         case hash_grid_move_y:
             if (cmd.paramCount == 1)
             {
-                grid_my = cmd.paramArray[0].toInt() * stepperY_ppmm;
+                grid_my = cmd.paramArray[0].toFloat() * stepperY_ppmm;
             }
             else
             {
