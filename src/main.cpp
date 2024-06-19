@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Bounce2.h>
 #include <AccelStepper.h>
+#include <EEPROM.h>
 #include "Command.h"
 #include "optoNCDT.h"
 
@@ -30,6 +31,18 @@ AccelStepper stepperZ(AccelStepper::DRIVER, z_pulse, z_direction);
 int stepperX_ppmm = 3200;
 int stepperY_ppmm = 3200;
 int stepperZ_ppmm = 320;
+
+struct StepperValues
+{
+    int xSpeed;
+    int xAccel;
+    int ySpeed;
+    int yAccel;
+    int zSpeed;
+    int zAccel;
+};
+
+StepperValues savedValues;
 
 Bounce2::Button z_max_bounce = Bounce2::Button();
 Bounce2::Button z_min_bounce = Bounce2::Button();
@@ -66,6 +79,8 @@ unsigned long pulseCount = 0;
 #define hash_help 2090324718
 #define hash_createCmd 2096566157
 #define hash_lim 193498183
+#define hash_save 2090715988
+#define hash_load 2090478981
 
 CmdParse parser = CmdParse();
 optoNCDT epsilon = optoNCDT();
@@ -79,6 +94,8 @@ int grid_mx = 0;
 int grid_my = 0;
 int grid_cols = 0;
 int grid_rows = 0;
+
+int eeprom_address = 69;
 
 void usagePrint(int cmdHash)
 {
@@ -259,46 +276,25 @@ void func_getspeed(char axis)
     switch (axis)
     {
     case 'x':
-        Serial.print("X axis\tMax Speed ");
         Serial.print(stepperX.maxSpeed() / stepperX_ppmm);
-        Serial.print(" mm/s (");
-        Serial.print(stepperX.maxSpeed());
-        Serial.print(" steps/s)");
-        Serial.print("\tAcceleration ");
+        Serial.print(':');
         Serial.print(stepperX.acceleration() / stepperX_ppmm);
-        Serial.print(" mm/s^2 (");
-        Serial.print(stepperX.acceleration());
-        Serial.println(" steps/s^2)");
         break;
     case 'y':
-        Serial.print("Y axis\tMax Speed ");
         Serial.print(stepperY.maxSpeed() / stepperY_ppmm);
-        Serial.print(" mm/s (");
-        Serial.print(stepperY.maxSpeed());
-        Serial.print(" steps/s)");
-        Serial.print("\tAcceleration ");
+        Serial.print(':');
         Serial.print(stepperY.acceleration() / stepperY_ppmm);
-        Serial.print(" mm/s^2 (");
-        Serial.print(stepperY.acceleration());
-        Serial.println(" steps/s^2)");
         break;
     case 'z':
-        Serial.print("Z axis\tMax Speed ");
         Serial.print(stepperZ.maxSpeed() / stepperZ_ppmm);
-        Serial.print(" mm/s (");
-        Serial.print(stepperZ.maxSpeed());
-        Serial.print(" steps/s)");
-        Serial.print("\tAcceleration ");
+        Serial.print(':');
         Serial.print(stepperZ.acceleration() / stepperZ_ppmm);
-        Serial.print(" mm/s^2 (");
-        Serial.print(stepperZ.acceleration());
-        Serial.println(" steps/s^2)");
         break;
     default:
         usagePrint(hash_speed);
-        Serial.print("\r");
         break;
     }
+    Serial.print("\r");
 }
 
 void func_posx() { Serial.println(stepperX.currentPosition()); }
@@ -412,9 +408,16 @@ void setup()
     y_min_bounce.attach(y_min, INPUT_PULLDOWN);
 
     // Set stepper motor max speed and acceleration
-    func_speed('x', 30.0, 1000.0);
-    func_speed('y', 30.0, 1000.0);
-    func_speed('z', 15.0, 1.5);
+    EEPROM.get(eeprom_address, savedValues);
+    stepperX.setMaxSpeed(savedValues.xSpeed);
+    stepperX.setAcceleration(savedValues.xAccel);
+    stepperY.setMaxSpeed(savedValues.ySpeed);
+    stepperY.setAcceleration(savedValues.yAccel);
+    stepperZ.setMaxSpeed(savedValues.zSpeed);
+    stepperZ.setAcceleration(savedValues.zAccel);
+    // func_speed('x', 30.0, 1000.0);
+    // func_speed('y', 30.0, 1000.0);
+    // func_speed('z', 15.0, 1.5);
 
     stepperX.stop();
     stepperZ.stop();
@@ -619,6 +622,23 @@ void loop()
             break;
         case hash_help:
             func_help();
+            break;
+        case hash_save:
+            StepperValues sv;
+            sv.xSpeed = stepperX.maxSpeed();
+            sv.xAccel = stepperX.acceleration();
+            sv.ySpeed = stepperY.maxSpeed();
+            sv.yAccel = stepperY.acceleration();
+            sv.zSpeed = stepperZ.maxSpeed();
+            sv.zAccel = stepperZ.acceleration();
+
+            EEPROM.put(eeprom_address, sv);
+            delay(10);
+            Serial.println("EEPROM_SAVED");
+            break;
+        case hash_load:
+            EEPROM.get(eeprom_address, savedValues);
+            Serial.println("Saved values loaded");
             break;
         case hash_createCmd:
             func_createCmd(cmd.paramArray[0]);
