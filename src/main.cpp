@@ -216,6 +216,11 @@ void func_createCmd(String cmdString) { Serial.println(parser.createCmd(cmdStrin
 
 void laser_bnc_interrupt() { pulseCount++; }
 
+/// @brief Move an axis
+/// @param stepper
+/// @param min_limit
+/// @param max_limit
+/// @param distance
 void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
 {
     bool moving = true;
@@ -245,6 +250,10 @@ void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Butto
     stepper.setCurrentPosition(stepper.currentPosition());
 }
 
+/// @brief Set the speed and acceleration of specified axis
+/// @param axis
+/// @param speed
+/// @param acceleration
 void func_speed(char axis, float speed, float acceleration)
 {
     switch (axis)
@@ -624,6 +633,7 @@ void loop()
             func_help();
             break;
         case hash_save:
+            // With this, we can save the set stepper motor speeds and acceleration to the EEPROM of the Teensy 4.0
             StepperValues sv;
             sv.xSpeed = stepperX.maxSpeed();
             sv.xAccel = stepperX.acceleration();
@@ -637,6 +647,7 @@ void loop()
             Serial.println("EEPROM_SAVED");
             break;
         case hash_load:
+            // Load the information from the EEPROM
             EEPROM.get(eeprom_address, savedValues);
             Serial.println("Saved values loaded");
             break;
