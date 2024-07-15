@@ -81,6 +81,7 @@ unsigned long pulseCount = 0;
 #define hash_lim 193498183
 #define hash_save 2090715988
 #define hash_load 2090478981
+#define hash_map 193499011
 
 CmdParse parser = CmdParse();
 optoNCDT epsilon = optoNCDT();
@@ -378,6 +379,36 @@ void func_gridMove()
     }
 }
 
+void func_map()
+{
+    int curCount, curCol;
+    int linCount = grid_cols * grid_rows;
+    curCount = 0;
+    curCol = 0;
+
+    while (curCount < linCount)
+    {
+        if (curCol < (grid_cols - 1))
+        {
+            func_move(stepperX, x_min_bounce, x_max_bounce, grid_mx);
+            curCol++;
+        }
+        else
+        {
+            func_move(stepperY, y_min_bounce, y_max_bounce, grid_my);
+            grid_mx *= -1;
+            curCol = 0;
+        }
+        curCount++;
+
+        delay(500);
+        Serial.println(epsilon.optoMeas());
+        delay(100);
+    }
+
+    Serial.println('MAPCOMPLETE');
+}
+
 void func_lim()
 {
     x_min_bounce.update();
@@ -462,7 +493,8 @@ void loop()
             func_posz();
             break;
         case hash_lasertoggle:
-            usagePrint(hash_lasertoggle);
+            // usagePrint(hash_lasertoggle);
+            func_lasertoggle();
             break;
         case hash_pulsecount:
             func_pulsecount();
@@ -606,22 +638,7 @@ void loop()
 
             break;
         case hash_optom:
-            while (true)
-            {
-                float epsiMeas = epsilon.optoMeas();
-                Serial.println(epsiMeas);
-                if (Serial.available())
-                {
-                    String input = Serial.readStringUntil('\n');
-                    cmd = parser.parseCommand(input);
-
-                    if (cmd.nameHash == hash_optos)
-                    {
-                        Serial.println(9876543210);
-                        break;
-                    }
-                }
-            }
+            Serial.println(epsilon.optoMeas());
             break;
         case hash_optoc:
             Serial.println(epsilon.optoCmd(cmd.parameters));
@@ -653,6 +670,9 @@ void loop()
             break;
         case hash_createCmd:
             func_createCmd(cmd.paramArray[0]);
+            break;
+        case hash_map:
+            func_map();
             break;
         default:
             func_createCmd(cmd.name);
