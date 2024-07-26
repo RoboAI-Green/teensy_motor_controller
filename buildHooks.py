@@ -14,6 +14,12 @@ import os
 import shutil
 Import("env", "projenv")
 
+board_config = env.BoardConfig()
+board_config.update("build.hwids", [
+   ["0x1209", #VIDS
+   "0xAD10" #PIDS
+]])
+
 deviceVID  = "0x1209"
 devicePID  = "0xAD10"
 propName = "Teensy Motor Controller"

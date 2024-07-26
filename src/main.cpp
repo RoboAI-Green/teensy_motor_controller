@@ -23,34 +23,6 @@
 #define z_min 12
 #define z_max 13
 
-AccelStepper stepperX(AccelStepper::DRIVER, x_pulse, x_direction);
-AccelStepper stepperY(AccelStepper::DRIVER, y_pulse, y_direction);
-AccelStepper stepperZ(AccelStepper::DRIVER, z_pulse, z_direction);
-
-// How many pulses it takes to move 1 mm
-int stepperX_ppmm = 3200;
-int stepperY_ppmm = 3200;
-int stepperZ_ppmm = 320;
-
-struct StepperValues
-{
-    int xSpeed;
-    int xAccel;
-    int ySpeed;
-    int yAccel;
-    int zSpeed;
-    int zAccel;
-};
-
-StepperValues savedValues;
-
-Bounce2::Button z_max_bounce = Bounce2::Button();
-Bounce2::Button z_min_bounce = Bounce2::Button();
-Bounce2::Button x_max_bounce = Bounce2::Button();
-Bounce2::Button x_min_bounce = Bounce2::Button();
-Bounce2::Button y_max_bounce = Bounce2::Button();
-Bounce2::Button y_min_bounce = Bounce2::Button();
-
 // Laser pulse BNC connection
 #define laser_bnc 14
 unsigned long pulseCount = 0;
@@ -82,6 +54,36 @@ unsigned long pulseCount = 0;
 #define hash_save 2090715988
 #define hash_load 2090478981
 #define hash_map 193499011
+#define hash_setzhome 326166452
+#define hash_homez 261599176
+
+struct StepperDriver
+{
+    AccelStepper motor;
+    Bounce2::Button min_switch;
+    Bounce2::Button max_switch;
+    int spmm;
+};
+
+StepperDriver stepperX;
+StepperDriver stepperY;
+StepperDriver stepperZ;
+
+StepperDriver drivers[] = {stepperX, stepperY, stepperZ};
+
+struct EEPROMValues
+{
+    int xSpeed;
+    int xAccel;
+    int ySpeed;
+    int yAccel;
+    int zSpeed;
+    int zAccel;
+    float zHome;
+};
+
+EEPROMValues savedValues;
+int eeprom_address = 42;
 
 CmdParse parser = CmdParse();
 optoNCDT epsilon = optoNCDT();
@@ -95,8 +97,7 @@ int grid_mx = 0;
 int grid_my = 0;
 int grid_cols = 0;
 int grid_rows = 0;
-
-int eeprom_address = 69;
+float zHomeDistance = 0;
 
 void usagePrint(int cmdHash)
 {
@@ -222,33 +223,35 @@ void laser_bnc_interrupt() { pulseCount++; }
 /// @param min_limit
 /// @param max_limit
 /// @param distance
-void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
+// void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
+void func_move(StepperDriver stepper, float distance_mm)
 {
     bool moving = true;
-    stepper.move(distance);
+    long distance = distance_mm * stepper.spmm;
+    stepper.motor.move(distance);
 
     while (moving)
     {
-        min_limit.update();
-        max_limit.update();
+        stepper.min_switch.update();
+        stepper.max_switch.update();
 
         if (
-            (distance < 0 && (min_limit.isPressed() || min_limit.rose())) ||
-            (distance > 0 && (max_limit.isPressed() || max_limit.rose())) ||
-            stepper.distanceToGo() == 0)
+            (distance < 0 && (stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
+            (distance > 0 && (stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
+            stepper.motor.distanceToGo() == 0)
         {
             moving = false;
-            stepper.stop();
+            stepper.motor.stop();
             Serial.print("MEND\r");
         }
         else
         {
-            stepper.run();
+            stepper.motor.run();
         }
     }
 
-    stepper.stop();
-    stepper.setCurrentPosition(stepper.currentPosition());
+    stepper.motor.stop();
+    stepper.motor.setCurrentPosition(stepper.motor.currentPosition());
 }
 
 /// @brief Set the speed and acceleration of specified axis
@@ -260,18 +263,18 @@ void func_speed(char axis, float speed, float acceleration)
     switch (axis)
     {
     case 'x':
-        stepperX.setMaxSpeed(speed * stepperX_ppmm);
-        stepperX.setAcceleration(acceleration * stepperX_ppmm);
+        stepperX.motor.setMaxSpeed(speed * stepperX.spmm);
+        stepperX.motor.setAcceleration(acceleration * stepperX.spmm);
         Serial.println("X_SPEEDSET");
         break;
     case 'y':
-        stepperY.setMaxSpeed(speed * stepperY_ppmm);
-        stepperY.setAcceleration(acceleration * stepperY_ppmm);
+        stepperY.motor.setMaxSpeed(speed * stepperY.spmm);
+        stepperY.motor.setAcceleration(acceleration * stepperY.spmm);
         Serial.println("Y_SPEEDSET");
         break;
     case 'z':
-        stepperZ.setMaxSpeed(speed * stepperZ_ppmm);
-        stepperZ.setAcceleration(acceleration * stepperZ_ppmm);
+        stepperZ.motor.setMaxSpeed(speed * stepperZ.spmm);
+        stepperZ.motor.setAcceleration(acceleration * stepperZ.spmm);
         Serial.println("Z_SPEEDSET");
         break;
     default:
@@ -286,19 +289,19 @@ void func_getspeed(char axis)
     switch (axis)
     {
     case 'x':
-        Serial.print(stepperX.maxSpeed() / stepperX_ppmm);
+        Serial.print(stepperX.motor.maxSpeed() / stepperX.spmm);
         Serial.print(':');
-        Serial.print(stepperX.acceleration() / stepperX_ppmm);
+        Serial.print(stepperX.motor.acceleration() / stepperX.spmm);
         break;
     case 'y':
-        Serial.print(stepperY.maxSpeed() / stepperY_ppmm);
+        Serial.print(stepperY.motor.maxSpeed() / stepperY.spmm);
         Serial.print(':');
-        Serial.print(stepperY.acceleration() / stepperY_ppmm);
+        Serial.print(stepperY.motor.acceleration() / stepperY.spmm);
         break;
     case 'z':
-        Serial.print(stepperZ.maxSpeed() / stepperZ_ppmm);
+        Serial.print(stepperZ.motor.maxSpeed() / stepperZ.spmm);
         Serial.print(':');
-        Serial.print(stepperZ.acceleration() / stepperZ_ppmm);
+        Serial.print(stepperZ.motor.acceleration() / stepperZ.spmm);
         break;
     default:
         usagePrint(hash_speed);
@@ -307,9 +310,9 @@ void func_getspeed(char axis)
     Serial.print("\r");
 }
 
-void func_posx() { Serial.println(stepperX.currentPosition()); }
-void func_posy() { Serial.println(stepperY.currentPosition()); }
-void func_posz() { Serial.println(stepperZ.currentPosition()); }
+void func_posx() { Serial.println(stepperX.motor.currentPosition()); }
+void func_posy() { Serial.println(stepperY.motor.currentPosition()); }
+void func_posz() { Serial.println(stepperZ.motor.currentPosition()); }
 
 void func_pulsecount()
 {
@@ -334,20 +337,27 @@ void func_lasertoggle()
 
 void func_gridMove()
 {
+    Serial.println("GRIDSTART");
     bool warm = false;
     int curMove, curCount, curRow, curCol;
     curMove = curCount = curRow = curCol = 0;
     int linCount = grid_cols * grid_rows;
+    long unsigned int pco = 0;
 
     // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
     while (curCount < linCount)
     {
-        Serial.print("Pulse count: ");
-        Serial.print(pulseCount);
-        Serial.print("\tCur count: ");
-        Serial.print(curCount);
-        Serial.print("\tLin count: ");
-        Serial.println(linCount);
+
+        if (pulseCount != pco)
+        {
+            Serial.print("Pulse count: ");
+            Serial.print(pulseCount);
+            Serial.print("\tCur count: ");
+            Serial.print(curCount);
+            Serial.print("\tLin count: ");
+            Serial.println(linCount);
+            pco = pulseCount;
+        }
         // Check if warmup shots have been fired.
         // - Pulse count is continuously increasing value, provided by every single pulse fired
         //   via the BNC connection from the Quantel Falcon controlbox
@@ -359,12 +369,12 @@ void func_gridMove()
             {
                 if (curCol < (grid_cols - 1))
                 {
-                    func_move(stepperX, x_min_bounce, x_max_bounce, grid_mx);
+                    func_move(stepperX, grid_mx);
                     curCol++;
                 }
                 else
                 {
-                    func_move(stepperY, y_min_bounce, y_max_bounce, grid_my);
+                    func_move(stepperY, grid_my);
                     grid_mx *= -1;
                     curCol = 0;
                 }
@@ -374,9 +384,10 @@ void func_gridMove()
         else if (pulseCount == grid_blanks)
         {
             warm = true;
-            func_move(stepperX, x_min_bounce, x_max_bounce, grid_ini_move);
+            func_move(stepperX, grid_ini_move);
         }
     }
+    Serial.println("GRIDCOMPLETE");
 }
 
 void func_map()
@@ -390,12 +401,12 @@ void func_map()
     {
         if (curCol < (grid_cols - 1))
         {
-            func_move(stepperX, x_min_bounce, x_max_bounce, grid_mx);
+            func_move(stepperX, grid_mx);
             curCol++;
         }
         else
         {
-            func_move(stepperY, y_min_bounce, y_max_bounce, grid_my);
+            func_move(stepperY, grid_my);
             grid_mx *= -1;
             curCol = 0;
         }
@@ -406,31 +417,54 @@ void func_map()
         delay(100);
     }
 
-    Serial.println('MAPCOMPLETE');
+    Serial.println("MAPCOMPLETE");
 }
 
 void func_lim()
 {
-    x_min_bounce.update();
-    x_max_bounce.update();
-    y_min_bounce.update();
-    y_max_bounce.update();
-    z_min_bounce.update();
-    z_max_bounce.update();
+    for (byte i = 0; i < 3; i++)
+    {
+        drivers[i].max_switch.update();
+        drivers[i].min_switch.update();
+    }
 
     Serial.print("X MIN STATE: ");
-    Serial.print(x_min_bounce.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(stepperX.min_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("X MAX STATE: ");
-    Serial.print(x_max_bounce.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(stepperX.max_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Y MIN STATE: ");
-    Serial.print(y_min_bounce.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(stepperY.min_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Y MAX STATE: ");
-    Serial.print(y_max_bounce.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(stepperY.max_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Z MIN STATE: ");
-    Serial.print(z_min_bounce.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(stepperZ.min_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Z MAX STATE: ");
-    Serial.print(z_max_bounce.isPressed() ? "Yes" : "No");
+    Serial.print(stepperZ.max_switch.isPressed() ? "Yes" : "No");
     Serial.print("\r");
+}
+
+void func_homez()
+{
+    float z_dist = epsilon.optoMeas();
+    float dToGo = zHomeDistance - z_dist;
+
+    if (z_dist < 200'000)
+    {
+        while (dToGo >= 0.1 || dToGo <= -0.1)
+        {
+            func_move(stepperZ, -1 * dToGo);
+
+            z_dist = epsilon.optoMeas();
+            dToGo = zHomeDistance - z_dist;
+            Serial.println(dToGo);
+        }
+    }
+    else
+    {
+        Serial.println(z_dist);
+    }
+
+    Serial.println("HOMEDONE");
 }
 
 void setup()
@@ -439,29 +473,43 @@ void setup()
     epsilon.begin(921600, SERIAL_8N1);
     epsilon.setMeasuringRange(100);
 
-    // Attach buttons
-    z_max_bounce.attach(z_max, INPUT_PULLDOWN);
-    z_min_bounce.attach(z_min, INPUT_PULLDOWN);
-    x_max_bounce.attach(x_max, INPUT_PULLDOWN);
-    x_min_bounce.attach(x_min, INPUT_PULLDOWN);
-    y_max_bounce.attach(y_max, INPUT_PULLDOWN);
-    y_min_bounce.attach(y_min, INPUT_PULLDOWN);
+    stepperX.motor = AccelStepper(AccelStepper::DRIVER, x_pulse, x_direction);
+    stepperY.motor = AccelStepper(AccelStepper::DRIVER, y_pulse, y_direction);
+    stepperZ.motor = AccelStepper(AccelStepper::DRIVER, z_pulse, z_direction);
+
+    // How many pulses it takes to move 1 mm
+    stepperX.spmm = 3200;
+    stepperY.spmm = 3200;
+    stepperZ.spmm = 320;
+
+    stepperX.max_switch = Bounce2::Button();
+    stepperX.min_switch = Bounce2::Button();
+    stepperY.max_switch = Bounce2::Button();
+    stepperY.min_switch = Bounce2::Button();
+    stepperZ.max_switch = Bounce2::Button();
+    stepperZ.min_switch = Bounce2::Button();
+
+    // // Attach buttons
+    stepperX.max_switch.attach(x_max, INPUT_PULLDOWN);
+    stepperX.min_switch.attach(x_min, INPUT_PULLDOWN);
+    stepperY.max_switch.attach(y_max, INPUT_PULLDOWN);
+    stepperY.min_switch.attach(y_min, INPUT_PULLDOWN);
+    stepperZ.max_switch.attach(z_max, INPUT_PULLDOWN);
+    stepperZ.min_switch.attach(z_min, INPUT_PULLDOWN);
 
     // Set stepper motor max speed and acceleration
     EEPROM.get(eeprom_address, savedValues);
-    stepperX.setMaxSpeed(savedValues.xSpeed);
-    stepperX.setAcceleration(savedValues.xAccel);
-    stepperY.setMaxSpeed(savedValues.ySpeed);
-    stepperY.setAcceleration(savedValues.yAccel);
-    stepperZ.setMaxSpeed(savedValues.zSpeed);
-    stepperZ.setAcceleration(savedValues.zAccel);
-    // func_speed('x', 30.0, 1000.0);
-    // func_speed('y', 30.0, 1000.0);
-    // func_speed('z', 15.0, 1.5);
+    stepperX.motor.setMaxSpeed(savedValues.xSpeed);
+    stepperX.motor.setAcceleration(savedValues.xAccel);
+    stepperY.motor.setMaxSpeed(savedValues.ySpeed);
+    stepperY.motor.setAcceleration(savedValues.yAccel);
+    stepperZ.motor.setMaxSpeed(savedValues.zSpeed);
+    stepperZ.motor.setAcceleration(savedValues.zAccel);
+    zHomeDistance = savedValues.zHome;
 
-    stepperX.stop();
-    stepperZ.stop();
-    stepperY.stop();
+    stepperX.motor.stop();
+    stepperZ.motor.stop();
+    stepperY.motor.stop();
 
     // Attach laser pulse BNC as interrupt
     attachInterrupt(digitalPinToInterrupt(laser_bnc), laser_bnc_interrupt, RISING);
@@ -469,12 +517,11 @@ void setup()
 
 void loop()
 {
-    x_min_bounce.update();
-    x_max_bounce.update();
-    y_min_bounce.update();
-    y_max_bounce.update();
-    z_min_bounce.update();
-    z_max_bounce.update();
+    for (byte i = 0; i < 3; i++)
+    {
+        drivers[i].max_switch.update();
+        drivers[i].min_switch.update();
+    }
 
     if (Serial.available())
     {
@@ -537,6 +584,7 @@ void loop()
             if (cmd.paramCount == 1)
             {
                 grid_blanks = cmd.paramArray[0].toInt();
+                Serial.println(grid_blanks);
             }
             else
             {
@@ -547,7 +595,8 @@ void loop()
         case hash_grid_initial_move:
             if (cmd.paramCount == 1)
             {
-                grid_ini_move = cmd.paramArray[0].toFloat() * stepperX_ppmm;
+                grid_ini_move = cmd.paramArray[0].toFloat() * stepperX.spmm;
+                Serial.println(grid_ini_move);
             }
             else
             {
@@ -559,6 +608,7 @@ void loop()
             if (cmd.paramCount == 1)
             {
                 grid_ppp = cmd.paramArray[0].toInt();
+                Serial.println(grid_ppp);
             }
             else
             {
@@ -569,7 +619,8 @@ void loop()
         case hash_grid_move_x:
             if (cmd.paramCount == 1)
             {
-                grid_mx = cmd.paramArray[0].toFloat() * stepperX_ppmm;
+                grid_mx = cmd.paramArray[0].toFloat();
+                Serial.println(grid_mx);
             }
             else
             {
@@ -580,7 +631,8 @@ void loop()
         case hash_grid_move_y:
             if (cmd.paramCount == 1)
             {
-                grid_my = cmd.paramArray[0].toFloat() * stepperY_ppmm;
+                grid_my = cmd.paramArray[0].toFloat();
+                Serial.println(grid_my);
             }
             else
             {
@@ -592,6 +644,7 @@ void loop()
             if (cmd.paramCount == 1)
             {
                 grid_cols = cmd.paramArray[0].toInt();
+                Serial.println(grid_cols);
             }
             else
             {
@@ -603,6 +656,7 @@ void loop()
             if (cmd.paramCount == 1)
             {
                 grid_rows = cmd.paramArray[0].toInt();
+                Serial.println(grid_rows);
             }
             else
             {
@@ -618,13 +672,13 @@ void loop()
                 switch (axis)
                 {
                 case 'x':
-                    func_move(stepperX, x_min_bounce, x_max_bounce, distance * stepperX_ppmm);
+                    func_move(stepperX, distance);
                     break;
                 case 'y':
-                    func_move(stepperY, y_min_bounce, y_max_bounce, distance * stepperY_ppmm);
+                    func_move(stepperY, distance);
                     break;
                 case 'z':
-                    func_move(stepperZ, z_min_bounce, z_max_bounce, distance * stepperZ_ppmm);
+                    func_move(stepperZ, distance);
                     break;
                 default:
                     break;
@@ -638,6 +692,7 @@ void loop()
 
             break;
         case hash_optom:
+            Serial.clear();
             Serial.println(epsilon.optoMeas());
             break;
         case hash_optoc:
@@ -651,13 +706,14 @@ void loop()
             break;
         case hash_save:
             // With this, we can save the set stepper motor speeds and acceleration to the EEPROM of the Teensy 4.0
-            StepperValues sv;
-            sv.xSpeed = stepperX.maxSpeed();
-            sv.xAccel = stepperX.acceleration();
-            sv.ySpeed = stepperY.maxSpeed();
-            sv.yAccel = stepperY.acceleration();
-            sv.zSpeed = stepperZ.maxSpeed();
-            sv.zAccel = stepperZ.acceleration();
+            EEPROMValues sv;
+            sv.xSpeed = stepperX.motor.maxSpeed();
+            sv.xAccel = stepperX.motor.acceleration();
+            sv.ySpeed = stepperY.motor.maxSpeed();
+            sv.yAccel = stepperY.motor.acceleration();
+            sv.zSpeed = stepperZ.motor.maxSpeed();
+            sv.zAccel = stepperZ.motor.acceleration();
+            sv.zHome = zHomeDistance;
 
             EEPROM.put(eeprom_address, sv);
             delay(10);
@@ -673,6 +729,18 @@ void loop()
             break;
         case hash_map:
             func_map();
+            break;
+        case hash_setzhome:
+            if (cmd.paramCount == 1)
+            {
+                float distance = cmd.paramArray[0].toFloat();
+                zHomeDistance = distance;
+            }
+
+            Serial.println(zHomeDistance);
+            break;
+        case hash_homez:
+            func_homez();
             break;
         default:
             func_createCmd(cmd.name);

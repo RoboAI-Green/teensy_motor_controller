@@ -29,6 +29,7 @@ void optoNCDT::setMeasuringRange(int range)
 float optoNCDT::optoMeas()
 {
   uint8_t lByte, mByte, hByte;
+  Serial1.clear();
   // Read the L-Byte packet
   while (true)
   {
@@ -77,7 +78,7 @@ float optoNCDT::optoMeas()
   }
   else
   {
-    return float(0);
+    return float(x);
   }
 }
 
