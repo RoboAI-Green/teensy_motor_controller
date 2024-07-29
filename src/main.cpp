@@ -224,7 +224,7 @@ void laser_bnc_interrupt() { pulseCount++; }
 /// @param max_limit
 /// @param distance
 // void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
-void func_move(StepperDriver stepper, float distance_mm)
+void func_move(StepperDriver &stepper, float distance_mm)
 {
     bool moving = true;
     long distance = distance_mm * stepper.spmm;
@@ -236,8 +236,10 @@ void func_move(StepperDriver stepper, float distance_mm)
         stepper.max_switch.update();
 
         if (
-            (distance < 0 && (stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
-            (distance > 0 && (stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
+            // (distance < 0 && (stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
+            // (distance > 0 && (stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
+            ((stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
+            ((stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
             stepper.motor.distanceToGo() == 0)
         {
             moving = false;
@@ -420,50 +422,65 @@ void func_map()
     Serial.println("MAPCOMPLETE");
 }
 
-void func_lim()
+void func_lim(StepperDriver &driverX, StepperDriver &driverY, StepperDriver &driverZ)
 {
-    for (byte i = 0; i < 3; i++)
-    {
-        drivers[i].max_switch.update();
-        drivers[i].min_switch.update();
-    }
+
+    driverX.max_switch.update();
+    driverX.min_switch.update();
+    driverY.max_switch.update();
+    driverY.min_switch.update();
+    driverZ.max_switch.update();
+    driverZ.min_switch.update();
 
     Serial.print("X MIN STATE: ");
-    Serial.print(stepperX.min_switch.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(driverX.min_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("X MAX STATE: ");
-    Serial.print(stepperX.max_switch.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(driverX.max_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Y MIN STATE: ");
-    Serial.print(stepperY.min_switch.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(driverY.min_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Y MAX STATE: ");
-    Serial.print(stepperY.max_switch.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(driverY.max_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Z MIN STATE: ");
-    Serial.print(stepperZ.min_switch.isPressed() ? "Yes\n" : "No\n");
+    Serial.print(driverZ.min_switch.isPressed() ? "Yes\n" : "No\n");
     Serial.print("Z MAX STATE: ");
-    Serial.print(stepperZ.max_switch.isPressed() ? "Yes" : "No");
+    Serial.print(driverZ.max_switch.isPressed() ? "Yes" : "No");
     Serial.print("\r");
 }
 
-void func_homez()
+void func_homez(StepperDriver &driver)
 {
     float z_dist = epsilon.optoMeas();
     float dToGo = zHomeDistance - z_dist;
+    driver.min_switch.update();
+    driver.max_switch.update();
 
     if (z_dist < 200'000)
     {
         while (dToGo >= 0.1 || dToGo <= -0.1)
         {
+            driver.min_switch.update();
+            driver.max_switch.update();
             func_move(stepperZ, -1 * dToGo);
-
-            z_dist = epsilon.optoMeas();
-            dToGo = zHomeDistance - z_dist;
-            Serial.println(dToGo);
+            
+            if(driver.min_switch.isPressed() || driver.min_switch.rose() || driver.max_switch.isPressed() || driver.max_switch.rose()){
+                dToGo = 0.01;
+                Serial.println("Z LIMIT PRESSED");
+                Serial.println(dToGo);
+                // break;
+            }
+            else{
+                z_dist = epsilon.optoMeas();
+                dToGo = zHomeDistance - z_dist;
+                Serial.println(dToGo);
+            }
         }
     }
     else
     {
         Serial.println(z_dist);
     }
-
+    driver.min_switch.update();
+    driver.max_switch.update();
     Serial.println("HOMEDONE");
 }
 
@@ -517,11 +534,12 @@ void setup()
 
 void loop()
 {
-    for (byte i = 0; i < 3; i++)
-    {
-        drivers[i].max_switch.update();
-        drivers[i].min_switch.update();
-    }
+    stepperX.max_switch.update();
+    stepperX.min_switch.update();
+    stepperY.max_switch.update();
+    stepperY.min_switch.update();
+    stepperZ.max_switch.update();
+    stepperZ.min_switch.update();
 
     if (Serial.available())
     {
@@ -699,7 +717,7 @@ void loop()
             Serial.println(epsilon.optoCmd(cmd.parameters));
             break;
         case hash_lim:
-            func_lim();
+            func_lim(stepperX,stepperY,stepperZ);
             break;
         case hash_help:
             func_help();
@@ -740,7 +758,7 @@ void loop()
             Serial.println(zHomeDistance);
             break;
         case hash_homez:
-            func_homez();
+            func_homez(stepperZ);
             break;
         default:
             func_createCmd(cmd.name);
