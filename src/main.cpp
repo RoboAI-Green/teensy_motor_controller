@@ -57,20 +57,16 @@ unsigned long pulseCount = 0;
 #define hash_setzhome 326166452
 #define hash_homez 261599176
 
+/// @brief Structure that contains stepper controller, min and max limit switches, and steps per mm information.
 struct StepperDriver
 {
     AccelStepper motor;
     Bounce2::Button min_switch;
     Bounce2::Button max_switch;
     int spmm;
-};
+} stepperX, stepperY, stepperZ;
 
-StepperDriver stepperX;
-StepperDriver stepperY;
-StepperDriver stepperZ;
-
-StepperDriver drivers[] = {stepperX, stepperY, stepperZ};
-
+/// @brief Sturcture that contains speed and acceleration infromation for X,Y,Z drivers and the Z home distance.
 struct EEPROMValues
 {
     int xSpeed;
@@ -80,9 +76,8 @@ struct EEPROMValues
     int zSpeed;
     int zAccel;
     float zHome;
-};
+} savedValues;
 
-EEPROMValues savedValues;
 int eeprom_address = 42;
 
 CmdParse parser = CmdParse();
@@ -99,6 +94,8 @@ int grid_cols = 0;
 int grid_rows = 0;
 float zHomeDistance = 0;
 
+/// @brief Prints information on how to use specified function
+/// @param cmdHash
 void usagePrint(int cmdHash)
 {
     switch (cmdHash)
@@ -190,6 +187,7 @@ void usagePrint(int cmdHash)
     }
 }
 
+/// @brief Prints all possible commands and their usage information
 void func_help()
 {
     usagePrint(hash_posx);
@@ -218,48 +216,45 @@ void func_createCmd(String cmdString) { Serial.println(parser.createCmd(cmdStrin
 
 void laser_bnc_interrupt() { pulseCount++; }
 
-/// @brief Move an axis
-/// @param stepper
-/// @param min_limit
-/// @param max_limit
-/// @param distance
-// void func_move(AccelStepper &stepper, Bounce2::Button &min_limit, Bounce2::Button &max_limit, int distance)
-void func_move(StepperDriver &stepper, float distance_mm)
+/// @brief Move specified axis
+/// @param stepper Stepper driver structure
+/// @param distance Distance to move in mm
+void func_move(StepperDriver &ref_stepper, float distance_mm)
 {
     bool moving = true;
-    long distance = distance_mm * stepper.spmm;
-    stepper.motor.move(distance);
+    long distance = distance_mm * ref_stepper.spmm;
+    ref_stepper.motor.move(distance);
 
     while (moving)
     {
-        stepper.min_switch.update();
-        stepper.max_switch.update();
+        ref_stepper.min_switch.update();
+        ref_stepper.max_switch.update();
 
         if (
             // (distance < 0 && (stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
             // (distance > 0 && (stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
-            ((stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
-            ((stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
-            stepper.motor.distanceToGo() == 0)
+            ((ref_stepper.min_switch.isPressed() || ref_stepper.min_switch.rose())) ||
+            ((ref_stepper.max_switch.isPressed() || ref_stepper.max_switch.rose())) ||
+            ref_stepper.motor.distanceToGo() == 0)
         {
             moving = false;
-            stepper.motor.stop();
+            ref_stepper.motor.stop();
             Serial.print("MEND\r");
         }
         else
         {
-            stepper.motor.run();
+            ref_stepper.motor.run();
         }
     }
 
-    stepper.motor.stop();
-    stepper.motor.setCurrentPosition(stepper.motor.currentPosition());
+    ref_stepper.motor.stop();
+    ref_stepper.motor.setCurrentPosition(ref_stepper.motor.currentPosition());
 }
 
 /// @brief Set the speed and acceleration of specified axis
 /// @param axis
-/// @param speed
-/// @param acceleration
+/// @param speed Unit is mm/s
+/// @param acceleration Unit is mm/s^2
 void func_speed(char axis, float speed, float acceleration)
 {
     switch (axis)
@@ -286,6 +281,8 @@ void func_speed(char axis, float speed, float acceleration)
     }
 }
 
+/// @brief Prints speed and acceleration of specified axis. Format is `speed:acceleration`
+/// @param axis
 void func_getspeed(char axis)
 {
     switch (axis)
@@ -337,6 +334,7 @@ void func_lasertoggle()
     }
 }
 
+/// @brief Start grid movement.
 void func_gridMove()
 {
     Serial.println("GRIDSTART");
@@ -349,7 +347,8 @@ void func_gridMove()
     // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
     while (curCount < linCount)
     {
-
+        // This if statement is used to print only once, information about the pulse count, current count, and total pulses needed, for each pulse fired.
+        // Without this, the system would print this repeatably, flooding the Serial
         if (pulseCount != pco)
         {
             Serial.print("Pulse count: ");
@@ -422,6 +421,10 @@ void func_map()
     Serial.println("MAPCOMPLETE");
 }
 
+/// @brief Print status of limit switches
+/// @param driverX Stepper driver for X axis
+/// @param driverY Stepper driver for Y axis
+/// @param driverZ Stepper driver for Z axis
 void func_lim(StepperDriver &driverX, StepperDriver &driverY, StepperDriver &driverZ)
 {
 
@@ -447,28 +450,30 @@ void func_lim(StepperDriver &driverX, StepperDriver &driverY, StepperDriver &dri
     Serial.print("\r");
 }
 
-void func_homez(StepperDriver &driver)
+/// @brief Home the Z axis, using sensor reading from Micro-Epsilon optoNCDT 1900 and the saved Z home distance.
+/// @param ref_driver Stepper driver for Z axis
+void func_homez(StepperDriver &ref_driver)
 {
     float z_dist = epsilon.optoMeas();
     float dToGo = zHomeDistance - z_dist;
-    driver.min_switch.update();
-    driver.max_switch.update();
 
     if (z_dist < 200'000)
     {
         while (dToGo >= 0.1 || dToGo <= -0.1)
         {
-            driver.min_switch.update();
-            driver.max_switch.update();
+            ref_driver.min_switch.update();
+            ref_driver.max_switch.update();
             func_move(stepperZ, -1 * dToGo);
-            
-            if(driver.min_switch.isPressed() || driver.min_switch.rose() || driver.max_switch.isPressed() || driver.max_switch.rose()){
+
+            if (ref_driver.min_switch.isPressed() || ref_driver.min_switch.rose() || ref_driver.max_switch.isPressed() || ref_driver.max_switch.rose())
+            {
                 dToGo = 0.01;
                 Serial.println("Z LIMIT PRESSED");
                 Serial.println(dToGo);
                 // break;
             }
-            else{
+            else
+            {
                 z_dist = epsilon.optoMeas();
                 dToGo = zHomeDistance - z_dist;
                 Serial.println(dToGo);
@@ -479,8 +484,7 @@ void func_homez(StepperDriver &driver)
     {
         Serial.println(z_dist);
     }
-    driver.min_switch.update();
-    driver.max_switch.update();
+
     Serial.println("HOMEDONE");
 }
 
@@ -534,6 +538,7 @@ void setup()
 
 void loop()
 {
+
     stepperX.max_switch.update();
     stepperX.min_switch.update();
     stepperY.max_switch.update();
@@ -558,7 +563,6 @@ void loop()
             func_posz();
             break;
         case hash_lasertoggle:
-            // usagePrint(hash_lasertoggle);
             func_lasertoggle();
             break;
         case hash_pulsecount:
@@ -566,7 +570,6 @@ void loop()
             break;
         case hash_resetpulse:
             pulseCount = 0;
-            // usagePrint(hash_resetpulse);
             break;
         case hash_speed:
             if (cmd.paramCount == 3)
@@ -601,6 +604,7 @@ void loop()
         case hash_grid_blanks:
             if (cmd.paramCount == 1)
             {
+                // This variable is used as a limit before the grid starts
                 grid_blanks = cmd.paramArray[0].toInt();
                 Serial.println(grid_blanks);
             }
@@ -613,6 +617,7 @@ void loop()
         case hash_grid_initial_move:
             if (cmd.paramCount == 1)
             {
+                // This variable is the distance the X axis moves after the blanking system is done.
                 grid_ini_move = cmd.paramArray[0].toFloat() * stepperX.spmm;
                 Serial.println(grid_ini_move);
             }
@@ -625,6 +630,7 @@ void loop()
         case hash_grid_shots:
             if (cmd.paramCount == 1)
             {
+                // This variable references to pulses per position, telling the system how many times a single point should be pulsed by the laser.
                 grid_ppp = cmd.paramArray[0].toInt();
                 Serial.println(grid_ppp);
             }
@@ -637,6 +643,7 @@ void loop()
         case hash_grid_move_x:
             if (cmd.paramCount == 1)
             {
+                // General value to tell grid function, how many mm to move the X axis, between grid positions
                 grid_mx = cmd.paramArray[0].toFloat();
                 Serial.println(grid_mx);
             }
@@ -649,6 +656,7 @@ void loop()
         case hash_grid_move_y:
             if (cmd.paramCount == 1)
             {
+                // General value to tell grid function, how many mm to move the Y axis, when moving to another row
                 grid_my = cmd.paramArray[0].toFloat();
                 Serial.println(grid_my);
             }
@@ -661,6 +669,7 @@ void loop()
         case hash_grid_columns:
             if (cmd.paramCount == 1)
             {
+                // This value is used for grid function, to calculate how many total pulses is needed to meet wanted points and how many times the X axis needs to move, before calling a move for the Y axis
                 grid_cols = cmd.paramArray[0].toInt();
                 Serial.println(grid_cols);
             }
@@ -673,6 +682,7 @@ void loop()
         case hash_grid_rows:
             if (cmd.paramCount == 1)
             {
+                // This value is used for grid function, to calculate how many total pulses is needed to meet wanted points and how many times the Y axis needs to move
                 grid_rows = cmd.paramArray[0].toInt();
                 Serial.println(grid_rows);
             }
@@ -710,14 +720,16 @@ void loop()
 
             break;
         case hash_optom:
+            // Print the distance reading from the Micro-Epsilon optoNCDT 1900
             Serial.clear();
             Serial.println(epsilon.optoMeas());
             break;
         case hash_optoc:
+            // Send a command to the Micro-Epsilon optoNCDT 1900 sensor
             Serial.println(epsilon.optoCmd(cmd.parameters));
             break;
         case hash_lim:
-            func_lim(stepperX,stepperY,stepperZ);
+            func_lim(stepperX, stepperY, stepperZ);
             break;
         case hash_help:
             func_help();
@@ -761,7 +773,6 @@ void loop()
             func_homez(stepperZ);
             break;
         default:
-            func_createCmd(cmd.name);
             Serial.println("Unknown command. Use help to see list of commands.");
             break;
         }
