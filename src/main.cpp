@@ -231,10 +231,8 @@ void func_move(StepperDriver &ref_stepper, float distance_mm)
         ref_stepper.max_switch.update();
 
         if (
-            // (distance < 0 && (stepper.min_switch.isPressed() || stepper.min_switch.rose())) ||
-            // (distance > 0 && (stepper.max_switch.isPressed() || stepper.max_switch.rose())) ||
-            ((ref_stepper.min_switch.isPressed() || ref_stepper.min_switch.rose())) ||
-            ((ref_stepper.max_switch.isPressed() || ref_stepper.max_switch.rose())) ||
+            (distance < 0 && (ref_stepper.min_switch.isPressed() || ref_stepper.min_switch.rose())) ||
+            (distance > 0 && (ref_stepper.max_switch.isPressed() || ref_stepper.max_switch.rose())) ||
             ref_stepper.motor.distanceToGo() == 0)
         {
             moving = false;
@@ -380,6 +378,7 @@ void func_gridMove()
                     curCol = 0;
                 }
                 curCount++;
+                Serial.println("GRIDMOVEND");
             }
         }
         else if (pulseCount == grid_blanks)
@@ -456,27 +455,31 @@ void func_homez(StepperDriver &ref_driver)
 {
     float z_dist = epsilon.optoMeas();
     float dToGo = zHomeDistance - z_dist;
+    bool moving = true;
 
     if (z_dist < 200'000)
     {
-        while (dToGo >= 0.1 || dToGo <= -0.1)
+        while ((dToGo >= 0.1 || dToGo <= -0.1) && moving)
         {
+            ref_driver.motor.move(-1 * dToGo);
+
             ref_driver.min_switch.update();
             ref_driver.max_switch.update();
-            func_move(stepperZ, -1 * dToGo);
 
-            if (ref_driver.min_switch.isPressed() || ref_driver.min_switch.rose() || ref_driver.max_switch.isPressed() || ref_driver.max_switch.rose())
+            if (ref_driver.min_switch.isPressed() || ref_driver.min_switch.rose() ||
+                ref_driver.max_switch.isPressed() || ref_driver.max_switch.rose())
             {
                 dToGo = 0.01;
                 Serial.println("Z LIMIT PRESSED");
                 Serial.println(dToGo);
-                // break;
+                moving = false;
+                break;
             }
             else
             {
+                ref_driver.motor.run();
                 z_dist = epsilon.optoMeas();
                 dToGo = zHomeDistance - z_dist;
-                Serial.println(dToGo);
             }
         }
     }
@@ -484,6 +487,9 @@ void func_homez(StepperDriver &ref_driver)
     {
         Serial.println(z_dist);
     }
+
+    ref_driver.motor.stop();
+    ref_driver.motor.setCurrentPosition(ref_driver.motor.currentPosition());
 
     Serial.println("HOMEDONE");
 }
@@ -618,7 +624,7 @@ void loop()
             if (cmd.paramCount == 1)
             {
                 // This variable is the distance the X axis moves after the blanking system is done.
-                grid_ini_move = cmd.paramArray[0].toFloat() * stepperX.spmm;
+                grid_ini_move = cmd.paramArray[0].toFloat();
                 Serial.println(grid_ini_move);
             }
             else
