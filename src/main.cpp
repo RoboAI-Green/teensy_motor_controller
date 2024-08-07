@@ -380,6 +380,7 @@ void func_gridMove()
                     curCol = 0;
                 }
                 curCount++;
+                Serial.println("GRIDMOVEND");
             }
         }
         else if (pulseCount == grid_blanks)
@@ -618,7 +619,7 @@ void loop()
             if (cmd.paramCount == 1)
             {
                 // This variable is the distance the X axis moves after the blanking system is done.
-                grid_ini_move = cmd.paramArray[0].toFloat() * stepperX.spmm;
+                grid_ini_move = cmd.paramArray[0].toFloat();
                 Serial.println(grid_ini_move);
             }
             else
