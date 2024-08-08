@@ -56,6 +56,7 @@ unsigned long pulseCount = 0;
 #define hash_map 193499011
 #define hash_setzhome 326166452
 #define hash_homez 261599176
+#define hash_timeit 505346961
 
 /// @brief Structure that contains stepper controller, min and max limit switches, and steps per mm information.
 struct StepperDriver
@@ -338,13 +339,16 @@ void func_homez(StepperDriver &ref_driver)
 {
     float z_dist = epsilon.optoMeas();
     float dToGo = zHomeDistance - z_dist;
+    long dToGoSteps = dToGo * ref_driver.spmm;
     bool moving = true;
+    bool limit = false;
 
     if (z_dist < 200'000)
     {
-        while ((dToGo >= 0.1 || dToGo <= -0.1) && moving)
+        while ((dToGo >= 0.01 || dToGo <= -0.01) && moving)
         {
-            ref_driver.motor.move(-1 * dToGo);
+            Serial.println(dToGo);
+            ref_driver.motor.move(-1 * dToGoSteps);
 
             ref_driver.min_switch.update();
             ref_driver.max_switch.update();
@@ -355,14 +359,29 @@ void func_homez(StepperDriver &ref_driver)
                 dToGo = 0.01;
                 Serial.println("Z LIMIT PRESSED");
                 Serial.println(dToGo);
+                ref_driver.motor.stop();
                 moving = false;
-                break;
+                limit = true;
+            }
+            else if (ref_driver.motor.distanceToGo() == 0)
+            {
+                moving = false;
+                ref_driver.motor.stop();
             }
             else
             {
                 ref_driver.motor.run();
-                z_dist = epsilon.optoMeas();
+            }
+
+            z_dist = epsilon.optoMeas();
+            if (z_dist < 200'000 && !limit)
+            {
                 dToGo = zHomeDistance - z_dist;
+                dToGoSteps = dToGo * ref_driver.spmm;
+            }
+            else
+            {
+                moving = false;
             }
         }
     }
@@ -411,6 +430,7 @@ void func_gridMove()
             curMove = pulseCount - (grid_blanks + curCount * grid_ppp);
             if (curMove == grid_ppp)
             {
+                func_lasertoggle();
                 if (curCol < (grid_cols - 1))
                 {
                     func_move(stepperX, grid_mx);
@@ -424,7 +444,6 @@ void func_gridMove()
                 }
 
                 // Move the Z distance
-                func_lasertoggle();
                 func_homez(stepperZ);
                 func_lasertoggle();
 
@@ -503,6 +522,23 @@ void func_lim(StepperDriver &driverX, StepperDriver &driverY, StepperDriver &dri
     Serial.print("Z MAX STATE: ");
     Serial.print(driverZ.max_switch.isPressed() ? "Yes" : "No");
     Serial.print("\r");
+}
+
+void func_timeit()
+{
+    epsilon.optoCmd("LASERPOW OFF");
+    float z_dist = epsilon.optoMeas();
+
+    elapsedMillis sincePrint;
+    sincePrint = 0;
+
+    epsilon.optoCmd("LASERPOW FULL");
+    while (z_dist > 200'000)
+    {
+        z_dist = epsilon.optoMeas();
+    }
+    Serial.print(sincePrint);
+    Serial.println(" ms");
 }
 
 void setup()
@@ -788,6 +824,9 @@ void loop()
             break;
         case hash_homez:
             func_homez(stepperZ);
+            break;
+        case hash_timeit:
+            func_timeit();
             break;
         default:
             Serial.println("Unknown command. Use help to see list of commands.");
