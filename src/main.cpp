@@ -332,6 +332,51 @@ void func_lasertoggle()
     }
 }
 
+/// @brief Home the Z axis, using sensor reading from Micro-Epsilon optoNCDT 1900 and the saved Z home distance.
+/// @param ref_driver Stepper driver for Z axis
+void func_homez(StepperDriver &ref_driver)
+{
+    float z_dist = epsilon.optoMeas();
+    float dToGo = zHomeDistance - z_dist;
+    bool moving = true;
+
+    if (z_dist < 200'000)
+    {
+        while ((dToGo >= 0.1 || dToGo <= -0.1) && moving)
+        {
+            ref_driver.motor.move(-1 * dToGo);
+
+            ref_driver.min_switch.update();
+            ref_driver.max_switch.update();
+
+            if (ref_driver.min_switch.isPressed() || ref_driver.min_switch.rose() ||
+                ref_driver.max_switch.isPressed() || ref_driver.max_switch.rose())
+            {
+                dToGo = 0.01;
+                Serial.println("Z LIMIT PRESSED");
+                Serial.println(dToGo);
+                moving = false;
+                break;
+            }
+            else
+            {
+                ref_driver.motor.run();
+                z_dist = epsilon.optoMeas();
+                dToGo = zHomeDistance - z_dist;
+            }
+        }
+    }
+    else
+    {
+        Serial.println(z_dist);
+    }
+
+    ref_driver.motor.stop();
+    ref_driver.motor.setCurrentPosition(ref_driver.motor.currentPosition());
+
+    Serial.println("HOMEDONE");
+}
+
 /// @brief Start grid movement.
 void func_gridMove()
 {
@@ -458,51 +503,6 @@ void func_lim(StepperDriver &driverX, StepperDriver &driverY, StepperDriver &dri
     Serial.print("Z MAX STATE: ");
     Serial.print(driverZ.max_switch.isPressed() ? "Yes" : "No");
     Serial.print("\r");
-}
-
-/// @brief Home the Z axis, using sensor reading from Micro-Epsilon optoNCDT 1900 and the saved Z home distance.
-/// @param ref_driver Stepper driver for Z axis
-void func_homez(StepperDriver &ref_driver)
-{
-    float z_dist = epsilon.optoMeas();
-    float dToGo = zHomeDistance - z_dist;
-    bool moving = true;
-
-    if (z_dist < 200'000)
-    {
-        while ((dToGo >= 0.1 || dToGo <= -0.1) && moving)
-        {
-            ref_driver.motor.move(-1 * dToGo);
-
-            ref_driver.min_switch.update();
-            ref_driver.max_switch.update();
-
-            if (ref_driver.min_switch.isPressed() || ref_driver.min_switch.rose() ||
-                ref_driver.max_switch.isPressed() || ref_driver.max_switch.rose())
-            {
-                dToGo = 0.01;
-                Serial.println("Z LIMIT PRESSED");
-                Serial.println(dToGo);
-                moving = false;
-                break;
-            }
-            else
-            {
-                ref_driver.motor.run();
-                z_dist = epsilon.optoMeas();
-                dToGo = zHomeDistance - z_dist;
-            }
-        }
-    }
-    else
-    {
-        Serial.println(z_dist);
-    }
-
-    ref_driver.motor.stop();
-    ref_driver.motor.setCurrentPosition(ref_driver.motor.currentPosition());
-
-    Serial.println("HOMEDONE");
 }
 
 void setup()
