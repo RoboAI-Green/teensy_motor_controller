@@ -347,7 +347,7 @@ void func_homez(StepperDriver &ref_driver)
     {
         while ((dToGo >= 0.01 || dToGo <= -0.01) && moving)
         {
-            Serial.println(dToGo);
+            // Serial.println(dToGo);
             ref_driver.motor.move(-1 * dToGoSteps);
 
             ref_driver.min_switch.update();
@@ -358,7 +358,7 @@ void func_homez(StepperDriver &ref_driver)
             {
                 dToGo = 0.01;
                 Serial.println("Z LIMIT PRESSED");
-                Serial.println(dToGo);
+                // Serial.println(dToGo);
                 ref_driver.motor.stop();
                 moving = false;
                 limit = true;
@@ -405,7 +405,10 @@ void func_gridMove()
     curMove = curCount = curRow = curCol = 0;
     int linCount = grid_cols * grid_rows;
     long unsigned int pco = 0;
-    func_lasertoggle();
+    if (optoLaser)
+    {
+        func_lasertoggle();
+    }
     // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
     while (curCount < linCount)
     {
@@ -526,19 +529,40 @@ void func_lim(StepperDriver &driverX, StepperDriver &driverY, StepperDriver &dri
 
 void func_timeit()
 {
-    epsilon.optoCmd("LASERPOW OFF");
-    float z_dist = epsilon.optoMeas();
-
     elapsedMillis sincePrint;
-    sincePrint = 0;
+    float totalTime = 0;
+    epsilon.optoCmd("LASERPOW OFF");
+    delay(500);
+    float z_dist = epsilon.optoMeas();
+    size_t count = 100;
 
-    epsilon.optoCmd("LASERPOW FULL");
-    while (z_dist > 200'000)
+    for (size_t i = 0; i < count; i++)
     {
-        z_dist = epsilon.optoMeas();
+        epsilon.optoCmd("LASERPOW OFF");
+        delay(100);
+        z_dist = 500'000;
+        sincePrint = 0;
+
+        epsilon.optoCmd("LASERPOW FULL");
+        while (z_dist > 200'000)
+        {
+            z_dist = epsilon.optoMeas();
+            Serial.print("Optomeas output: ");
+            Serial.println(z_dist);
+        }
+        totalTime += sincePrint;
+        Serial.print(sincePrint);
+        Serial.println(" ms");
     }
-    Serial.print(sincePrint);
+
+    Serial.println("----------");
+    Serial.print("Test count: ");
+    Serial.println(count);
+    Serial.print("Total time: ");
+    Serial.print(totalTime);
     Serial.println(" ms");
+    Serial.print("AVG TIME: ");
+    Serial.println(totalTime / count);
 }
 
 void setup()
