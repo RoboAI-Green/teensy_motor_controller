@@ -383,6 +383,11 @@ void func_gridMove()
                 func_homez(stepperZ);
                 func_lasertoggle();
 
+                if (pulseCount != pco)
+                {
+                    Serial.println("!!PULSE COUNT OUT OF SYNC!!");
+                }
+
                 curCount++;
                 Serial.println("GRIDMOVEND");
             }
