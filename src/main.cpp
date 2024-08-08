@@ -345,9 +345,10 @@ void func_homez(StepperDriver &ref_driver)
 
     if (z_dist < 200'000)
     {
-        while ((dToGo >= 0.01 || dToGo <= -0.01) && moving)
+        Serial.println(dToGo);
+        // while ((dToGo >= 0.01 || dToGo <= -0.01) && moving)
+        while (abs(dToGo) >= 0.01 && moving)
         {
-            // Serial.println(dToGo);
             ref_driver.motor.move(-1 * dToGoSteps);
 
             ref_driver.min_switch.update();
