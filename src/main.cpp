@@ -341,7 +341,7 @@ void func_gridMove()
     curMove = curCount = curRow = curCol = 0;
     int linCount = grid_cols * grid_rows;
     long unsigned int pco = 0;
-
+    func_lasertoggle();
     // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
     while (curCount < linCount)
     {
@@ -377,6 +377,12 @@ void func_gridMove()
                     grid_mx *= -1;
                     curCol = 0;
                 }
+
+                // Move the Z distance
+                func_lasertoggle();
+                func_homez(stepperZ);
+                func_lasertoggle();
+
                 curCount++;
                 Serial.println("GRIDMOVEND");
             }
