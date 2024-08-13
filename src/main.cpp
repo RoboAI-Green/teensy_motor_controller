@@ -464,8 +464,11 @@ void func_gridMove()
         }
         else if (pulseCount == grid_blanks)
         {
+            epsilon.optoCmd("LASERPOW FULL");
             warm = true;
             func_move(stepperX, grid_ini_move);
+            func_homez(stepperZ);
+            epsilon.optoCmd("LASERPOW OFF");
         }
     }
     Serial.println("GRIDCOMPLETE");
