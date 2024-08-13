@@ -87,10 +87,10 @@ optoNCDT epsilon = optoNCDT();
 bool optoLaser = true;
 
 unsigned long grid_blanks = 0;
-int grid_ini_move = 0;
+float grid_ini_move = 0;
 int grid_ppp = 0;
-int grid_mx = 0;
-int grid_my = 0;
+float grid_mx = 0;
+float grid_my = 0;
 int grid_cols = 0;
 int grid_rows = 0;
 float zHomeDistance = 0;
@@ -337,6 +337,7 @@ void func_lasertoggle()
 /// @param ref_driver Stepper driver for Z axis
 void func_homez(StepperDriver &ref_driver)
 {
+    
     float z_dist = epsilon.optoMeas();
     float dToGo = zHomeDistance - z_dist;
     long dToGoSteps = dToGo * ref_driver.spmm;
@@ -406,10 +407,8 @@ void func_gridMove()
     curMove = curCount = curRow = curCol = 0;
     int linCount = grid_cols * grid_rows;
     long unsigned int pco = 0;
-    if (optoLaser)
-    {
-        func_lasertoggle();
-    }
+    epsilon.optoCmd("LASERPOW OFF");
+
     // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
     while (curCount < linCount)
     {
@@ -434,14 +433,17 @@ void func_gridMove()
             curMove = pulseCount - (grid_blanks + curCount * grid_ppp);
             if (curMove == grid_ppp)
             {
-                func_lasertoggle();
+                epsilon.optoCmd("LASERPOW FULL");
+                delay(5);
                 if (curCol < (grid_cols - 1))
                 {
+                    Serial.println("MOVEX");
                     func_move(stepperX, grid_mx);
                     curCol++;
                 }
                 else
                 {
+                    Serial.println("MOVEY");
                     func_move(stepperY, grid_my);
                     grid_mx *= -1;
                     curCol = 0;
@@ -449,7 +451,7 @@ void func_gridMove()
 
                 // Move the Z distance
                 func_homez(stepperZ);
-                func_lasertoggle();
+                epsilon.optoCmd("LASERPOW OFF");
 
                 if (pulseCount != pco)
                 {
