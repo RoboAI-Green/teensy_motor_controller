@@ -57,6 +57,9 @@ unsigned long pulseCount = 0;
 #define hash_setzhome 326166452
 #define hash_homez 261599176
 #define hash_timeit 505346961
+#define hash_defocus 143439470
+#define hash_defocus_offset 1608925396
+#define hash_defocus_interval -260913486
 
 /// @brief Structure that contains stepper controller, min and max limit switches, and steps per mm information.
 struct StepperDriver
@@ -94,6 +97,10 @@ float grid_my = 0;
 int grid_cols = 0;
 int grid_rows = 0;
 float zHomeDistance = 0;
+
+bool defocus = false;
+float defocus_offset = 0.0;
+int defocus_interval = 0;
 
 /// @brief Prints information on how to use specified function
 /// @param cmdHash
@@ -182,6 +189,19 @@ void usagePrint(int cmdHash)
     case hash_optos:
         Serial.print("optos\n");
         Serial.print("\tThis would stop outputing OptoNCDT data, if it was displaying.\n\n");
+        break;
+    case hash_defocus:
+        Serial.print("defocus\n");
+        Serial.print("\tDefocus enabled/disabled\n");
+        Serial.print("\tUsage:\n\t\tdefocus [True/False]\n\n");
+        break;
+    case hash_defocus_interval:
+        Serial.print("defocus_interval\n");
+        Serial.print("\tHow many positions before defocus offset\n");
+        break;
+    case hash_defocus_offset:
+        Serial.print("defocus_offset\n");
+        Serial.print("\tSet defocus offset amount in mm\n");
         break;
     default:
         break;
@@ -403,6 +423,8 @@ void func_gridMove()
 {
     Serial.println("GRIDSTART");
     bool warm = false;
+    float curZHomeDist = zHomeDistance;
+    //float defocusDistance = 0;
     int curMove, curCount, curRow, curCol;
     curMove = curCount = curRow = curCol = 0;
     int linCount = grid_cols * grid_rows;
@@ -449,6 +471,14 @@ void func_gridMove()
                     curCol = 0;
                 }
 
+                // If defocus is enabled, and the current count is greater than 0 and divisible by the defocus interval, then add the defocus offset to the Z home distance.
+                if (defocus && curCount > 0 && (curCount + 1) % defocus_interval == 0)
+                {
+                    zHomeDistance += defocus_offset;
+                    //defocusDistance += defocus_offset;
+                    Serial.println("OFFSET");
+                }
+
                 // Move the Z distance
                 func_homez(stepperZ);
                 epsilon.optoCmd("LASERPOW OFF");
@@ -471,6 +501,10 @@ void func_gridMove()
             epsilon.optoCmd("LASERPOW OFF");
         }
     }
+    // This is used to reset the Z home distance to the original value, before the grid movement started.
+    Serial.println("Last Z homedistance: " + String(zHomeDistance));
+    Serial.println("Setting Z homedistance back to: " + String(curZHomeDist));
+    zHomeDistance = curZHomeDist;
     Serial.println("GRIDCOMPLETE");
 }
 
@@ -800,8 +834,55 @@ void loop()
                 usagePrint(hash_move);
                 Serial.print("\r");
             }
-
             break;
+
+        case hash_defocus:
+            if (cmd.paramCount == 1)
+            {
+                // This command is used to enable/disable defocus, which is used to offset the Z axis after a certain amount of positions when shooting in a grid.
+                String paramValue = cmd.paramArray[0];
+                if (paramValue.equalsIgnoreCase("True")) {
+                    defocus = true;
+                } else if (paramValue.equalsIgnoreCase("False")) {
+                    defocus = false;
+                }
+                Serial.println(defocus);
+            }
+            else
+            {
+                usagePrint(hash_defocus);
+                Serial.print("\r");
+            }
+            break;
+
+        case hash_defocus_offset:
+            if (cmd.paramCount == 1)
+            {
+                // This command is used to set the defocus offset amount in mm.
+                defocus_offset = cmd.paramArray[0].toFloat();
+                Serial.println(defocus_offset);
+            }
+            else
+            {
+                usagePrint(hash_defocus_offset);
+                Serial.print("\r");
+            }
+            break;
+
+        case hash_defocus_interval:
+            if (cmd.paramCount == 1)
+            {
+                // This command is used to set the defocus interval, which is used to tell the system how many positions it should move before applying the defocus offset.
+                defocus_interval = cmd.paramArray[0].toInt();
+                Serial.println(defocus_interval);
+            }
+            else
+            {
+                usagePrint(hash_defocus_interval);
+                Serial.print("\r");
+            }
+            break;
+            
         case hash_optom:
             // Print the distance reading from the Micro-Epsilon optoNCDT 1900
             Serial.clear();
