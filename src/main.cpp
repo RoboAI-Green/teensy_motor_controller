@@ -424,18 +424,14 @@ void func_gridMove()
     Serial.println("GRIDSTART");
     bool warm = false;
     float curZHomeDist = zHomeDistance;
-    //float defocusDistance = 0;
     int curMove, curCount, curRow, curCol;
     curMove = curCount = curRow = curCol = 0;
     int linCount = grid_cols * grid_rows;
     long unsigned int pco = 0;
     epsilon.optoCmd("LASERPOW OFF");
 
-    // Run the while loop, when the current measurement count is less than the calculated measurement ammount.
     while (curCount < linCount)
     {
-        // This if statement is used to print only once, information about the pulse count, current count, and total pulses needed, for each pulse fired.
-        // Without this, the system would print this repeatably, flooding the Serial
         if (pulseCount != pco)
         {
             Serial.print("Pulse count: ");
@@ -446,12 +442,9 @@ void func_gridMove()
             Serial.println(linCount);
             pco = pulseCount;
         }
-        // Check if warmup shots have been fired.
-        // - Pulse count is continuously increasing value, provided by every single pulse fired
-        //   via the BNC connection from the Quantel Falcon controlbox
+
         if (warm)
         {
-            // From the current pulse count, remove the calculated 3rd pulse for the current position
             curMove = pulseCount - (grid_blanks + curCount * grid_ppp);
             if (curMove == grid_ppp)
             {
@@ -471,15 +464,22 @@ void func_gridMove()
                     curCol = 0;
                 }
 
-                // If defocus is enabled, and the current count is greater than 0 and divisible by the defocus interval, then add the defocus offset to the Z home distance.
                 if (defocus && curCount > 0 && (curCount + 1) % defocus_interval == 0)
                 {
                     zHomeDistance += defocus_offset;
-                    //defocusDistance += defocus_offset;
                     Serial.println("OFFSET");
                 }
 
-                // Move the Z distance
+                // Move the Z axis and check if correction exceeds 1 mm
+                float z_dist = epsilon.optoMeas();
+                float dToGo = zHomeDistance - z_dist;
+                if (abs(dToGo) > 1.0)  // Check if Z correction exceeds 1 mm
+                {
+                    Serial.println("OVERZ");
+                    zHomeDistance = curZHomeDist;
+                    break;  // Stop grid movement
+                }
+
                 func_homez(stepperZ);
                 epsilon.optoCmd("LASERPOW OFF");
 
@@ -501,12 +501,13 @@ void func_gridMove()
             epsilon.optoCmd("LASERPOW OFF");
         }
     }
-    // This is used to reset the Z home distance to the original value, before the grid movement started.
-    Serial.println("Last Z homedistance: " + String(zHomeDistance));
-    Serial.println("Setting Z homedistance back to: " + String(curZHomeDist));
+
+    //Serial.println("Last Z homedistance: " + String(zHomeDistance));
+    //Serial.println("Setting Z homedistance back to: " + String(curZHomeDist));
     zHomeDistance = curZHomeDist;
     Serial.println("GRIDCOMPLETE");
 }
+
 
 void func_map()
 {
